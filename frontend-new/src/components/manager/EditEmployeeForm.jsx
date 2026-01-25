@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth } from '../../services/firebase';
 import { useToast } from '../../contexts/ToastContext';
 
-const EditEmployeeForm = ({ employee, onUpdate, onCancel }) => {
+const EditEmployeeForm = ({ employee, onUpdate, onCancel, onDelete }) => {
     const [name, setName] = useState(employee.name);
     const [email, setEmail] = useState(employee.email);
     const [loading, setLoading] = useState(false);
@@ -73,21 +73,32 @@ const EditEmployeeForm = ({ employee, onUpdate, onCancel }) => {
                             />
                         </div>
 
-                        <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                            <button
-                                type="button"
-                                onClick={onCancel}
-                                className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl hover:from-indigo-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                            >
-                                {loading ? 'Updating...' : 'Save Changes'}
-                            </button>
+                        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                            {onDelete && (
+                                <button
+                                    type="button"
+                                    onClick={onDelete}
+                                    className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-colors border border-transparent hover:border-red-100"
+                                >
+                                    Delete Account
+                                </button>
+                            )}
+                            <div className="flex gap-3 ml-auto">
+                                <button
+                                    type="button"
+                                    onClick={onCancel}
+                                    className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl hover:from-indigo-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                >
+                                    {loading ? 'Updating...' : 'Save Changes'}
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>

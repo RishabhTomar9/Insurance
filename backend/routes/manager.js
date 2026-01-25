@@ -89,32 +89,24 @@ router.post('/employee/update', async (req, res) => {
     }
 });
 
-router.post('/employee/status', async (req, res) => {
-    const { uid, status } = req.body;
+router.delete('/employee/:uid', async (req, res) => {
+    const { uid } = req.params;
 
-    if (!uid || !status) {
-        return res.status(400).send('Missing uid or status');
-    }
-
-    if (!['Active', 'On Leave', 'Deleted'].includes(status)) {
-        return res.status(400).send('Invalid status');
+    if (!uid) {
+        return res.status(400).send('Missing uid');
     }
 
     try {
-        // Only disable in Firebase if status is 'Deleted' (or maybe 'On Leave' if requested, but usually Active/On Leave means account accessible)
-        // Let's assume Deleted = Disabled.
-        const disabled = status === 'Deleted';
+        // Hard delete from Firebase
+        await admin.auth().deleteUser(uid);
 
-        await admin.auth().updateUser(uid, {
-            disabled: disabled,
-        });
+        // Hard delete from MongoDB
+        await User.findOneAndDelete({ uid });
 
-        await User.findOneAndUpdate({ uid }, { status, disabled });
-
-        res.status(200).send({ message: `Employee status updated to ${status}` });
+        res.status(200).send({ message: 'Employee deleted permanently' });
     } catch (error) {
-        console.error('Error updating employee status:', error);
-        res.status(500).send('Error updating employee status');
+        console.error('Error deleting employee:', error);
+        res.status(500).send('Error deleting employee');
     }
 });
 

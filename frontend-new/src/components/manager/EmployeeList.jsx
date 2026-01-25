@@ -33,39 +33,32 @@ const EmployeeList = () => {
         fetchEmployees();
     }, []);
 
-    const handleStatusChange = async (uid, newStatus) => {
-        if (newStatus === 'Deleted') {
-            const confirmed = await showConfirm(
-                'Delete Employee Account',
-                'Are you sure you want to delete this employee? This will revoke their access immediately.',
-                'danger'
-            );
-            if (!confirmed) {
-                fetchEmployees();
-                return;
-            }
-        }
+    const handleDelete = async (uid) => {
+        const confirmed = await showConfirm(
+            'Delete Employee Account',
+            'Are you sure you want to permanently delete this employee? This action cannot be undone.',
+            'danger'
+        );
+        if (!confirmed) return;
 
         try {
             const token = await auth.currentUser.getIdToken();
-            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/manager/employee/status`, {
-                method: 'POST',
+            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/manager/employee/${uid}`, {
+                method: 'DELETE',
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ uid, status: newStatus })
+                }
             });
 
             if (response.ok) {
-                addToast(`Status updated to ${newStatus}`, 'success');
+                addToast('Employee deleted successfully', 'success');
                 fetchEmployees();
             } else {
                 const data = await response.json();
-                addToast(data.message || 'Error updating status', 'error');
+                addToast(data.message || 'Error deleting employee', 'error');
             }
         } catch (error) {
-            addToast('Error updating status', 'error');
+            addToast('Error deleting employee', 'error');
         }
     };
 
@@ -97,18 +90,12 @@ const EmployeeList = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{employee.email}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 font-mono">{employee.employeeId}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                                <select
-                                    value={employee.status || (employee.disabled ? 'Deleted' : 'Active')}
-                                    onChange={(e) => handleStatusChange(employee.uid, e.target.value)}
-                                    className={`px-3 py-1 text-xs font-semibold rounded-full border-0 focus:ring-2 focus:ring-indigo-500 cursor-pointer ${(employee.status === 'Active' || (!employee.status && !employee.disabled)) ? 'bg-emerald-100 text-emerald-800' :
-                                        (employee.status === 'On Leave') ? 'bg-amber-100 text-amber-800' :
-                                            'bg-red-100 text-red-800'
-                                        }`}
-                                >
-                                    <option value="Active" className="bg-white text-slate-800">Active</option>
-                                    <option value="On Leave" className="bg-white text-slate-800">On Leave</option>
-                                    <option value="Deleted" className="bg-white text-slate-800">Deleted</option>
-                                </select>
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${employee.disabled
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-emerald-100 text-emerald-800'
+                                    }`}>
+                                    {employee.status || (employee.disabled ? 'Disabled' : 'Active')}
+                                </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                 <button
@@ -128,6 +115,10 @@ const EmployeeList = () => {
                     employee={editingEmployee}
                     onUpdate={handleUpdate}
                     onCancel={() => setEditingEmployee(null)}
+                    onDelete={() => {
+                        handleDelete(editingEmployee.uid);
+                        setEditingEmployee(null);
+                    }}
                 />
             )}
         </div>

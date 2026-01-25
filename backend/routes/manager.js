@@ -32,6 +32,7 @@ router.post('/employee', async (req, res) => {
             employeeId,
             role: 'employee',
             passwordChanged: false,
+            tempPassword: defaultPassword,
         });
         await newUser.save();
 

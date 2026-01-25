@@ -3,6 +3,52 @@ import { auth } from '../../services/firebase';
 import EditEmployeeForm from './EditEmployeeForm';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirmed } from '../../contexts/DialogContext';
+import { Eye, Copy, Check } from 'lucide-react';
+
+const PasswordCell = ({ tempPassword, passwordChanged }) => {
+    const [show, setShow] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(tempPassword);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    if (passwordChanged) {
+        return (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Updated
+            </span>
+        );
+    }
+
+    if (!tempPassword) {
+        return <span className="text-slate-400 text-xs">N/A</span>;
+    }
+
+    return (
+        <div className="flex items-center space-x-2">
+            <span className="font-mono text-xs">
+                {show ? tempPassword : '••••••••'}
+            </span>
+            <button
+                onClick={() => setShow(!show)}
+                className="text-slate-400 hover:text-indigo-600 transition-colors"
+                title={show ? "Hide" : "Show"}
+            >
+                <Eye size={14} />
+            </button>
+            <button
+                onClick={handleCopy}
+                className={`transition-colors ${copied ? 'text-green-600' : 'text-slate-400 hover:text-indigo-600'}`}
+                title="Copy"
+            >
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+            </button>
+        </div>
+    );
+};
 
 const EmployeeList = () => {
     const [employees, setEmployees] = useState([]);
@@ -79,6 +125,7 @@ const EmployeeList = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Email</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Employee ID</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Password</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
                     </tr>
@@ -89,6 +136,12 @@ const EmployeeList = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{employee.name}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{employee.email}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 font-mono">{employee.employeeId}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                                <PasswordCell
+                                    tempPassword={employee.tempPassword}
+                                    passwordChanged={employee.passwordChanged}
+                                />
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${employee.disabled
                                     ? 'bg-red-100 text-red-800'

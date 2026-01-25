@@ -36,6 +36,10 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    tempPassword: {
+        type: String,
+        default: null,
+    },
 }, {
     timestamps: true,
 });

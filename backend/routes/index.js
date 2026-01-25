@@ -71,7 +71,11 @@ router.put('/api/users/:uid', authMiddleware, async (req, res) => {
         if (req.user.role !== 'manager' && req.user.uid !== user.uid) {
             return res.status(403).send('Forbidden');
         }
-        const updatedUser = await User.findOneAndUpdate({ uid: req.params.uid }, req.body, { new: true });
+        const updates = { ...req.body };
+        if (req.body.passwordChanged) {
+            updates.tempPassword = null;
+        }
+        const updatedUser = await User.findOneAndUpdate({ uid: req.params.uid }, updates, { new: true });
         res.send(updatedUser);
     } catch (error) {
         res.status(500).send('Error updating user');

@@ -17,7 +17,7 @@ const AddPolicyForm = ({ onAdd, cars, owners }) => {
 
         try {
             const token = await auth.currentUser.getIdToken();
-            await fetch('http://localhost:3000/api/policies', {
+            await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/policies`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -3,10 +3,14 @@ const router = express.Router();
 const Car = require('../models/Car');
 const authMiddleware = require('../middleware/authMiddleware');
 
-// Get all cars for the logged in employee
+// Get all cars (Manager view all, Employee view own)
 router.get('/', authMiddleware, async (req, res) => {
     try {
-        const cars = await Car.find({ employeeId: req.user.uid });
+        let query = {};
+        if (req.user.role !== 'manager') {
+            query.employeeId = req.user.uid;
+        }
+        const cars = await Car.find(query);
         res.send(cars);
     } catch (error) {
         res.status(500).send('Error fetching cars');
@@ -16,10 +20,14 @@ router.get('/', authMiddleware, async (req, res) => {
 // Create a new car
 router.post('/', authMiddleware, async (req, res) => {
     try {
-        const newCar = new Car({
-            ...req.body,
-            employeeId: req.user.uid,
-        });
+        const carData = { ...req.body };
+        if (req.user.role === 'manager' && req.body.employeeId) {
+            carData.employeeId = req.body.employeeId;
+        } else {
+            carData.employeeId = req.user.uid;
+        }
+
+        const newCar = new Car(carData);
         await newCar.save();
         res.status(201).send(newCar);
     } catch (error) {
@@ -30,7 +38,22 @@ router.post('/', authMiddleware, async (req, res) => {
 // Update a car
 router.put('/:id', authMiddleware, async (req, res) => {
     try {
-        const car = await Car.findOneAndUpdate({ _id: req.params.id, employeeId: req.user.uid }, req.body, { new: true });
+        let query = { _id: req.params.id };
+        if (req.user.role !== 'manager') {
+            query.employeeId = req.user.uid;
+        }
+
+        // Prevent modification of unique identifiers
+        const updates = { ...req.body };
+        delete updates.chassisNumber;
+        delete updates.engineNumber;
+
+        // Prevent employees from changing ownership
+        if (req.user.role !== 'manager') {
+            delete updates.employeeId;
+        }
+
+        const car = await Car.findOneAndUpdate(query, updates, { new: true });
         if (!car) {
             return res.status(404).send('Car not found');
         }
@@ -43,7 +66,11 @@ router.put('/:id', authMiddleware, async (req, res) => {
 // Delete a car
 router.delete('/:id', authMiddleware, async (req, res) => {
     try {
-        const car = await Car.findOneAndDelete({ _id: req.params.id, employeeId: req.user.uid });
+        let query = { _id: req.params.id };
+        if (req.user.role !== 'manager') {
+            query.employeeId = req.user.uid;
+        }
+        const car = await Car.findOneAndDelete(query);
         if (!car) {
             return res.status(404).send('Car not found');
         }

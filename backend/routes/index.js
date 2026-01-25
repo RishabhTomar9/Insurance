@@ -4,7 +4,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 
 // Public routes
 router.get('/', (req, res) => {
-  res.send('Welcome to the Insurance CRM API');
+    res.send('Welcome to the Insurance CRM API');
 });
 
 const authRoutes = require('./auth');
@@ -38,7 +38,7 @@ router.get('/api/users/:uid', authMiddleware, async (req, res) => {
     try {
         const user = await User.findOne({ uid: req.params.uid });
         if (!user) {
-            return res.status(404).send('User not found');
+            return res.status(404).json({ message: 'User not found' });
         }
         if (req.user.role !== 'manager' && req.user.uid !== user.uid) {
             return res.status(403).send('Forbidden');
@@ -66,7 +66,7 @@ router.put('/api/users/:uid', authMiddleware, async (req, res) => {
     try {
         const user = await User.findOne({ uid: req.params.uid });
         if (!user) {
-            return res.status(404).send('User not found');
+            return res.status(404).json({ message: 'User not found' });
         }
         if (req.user.role !== 'manager' && req.user.uid !== user.uid) {
             return res.status(403).send('Forbidden');

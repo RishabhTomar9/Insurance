@@ -15,7 +15,7 @@ const AddOwnerForm = ({ onAdd }) => {
 
         try {
             const token = await auth.currentUser.getIdToken();
-            await fetch('http://localhost:3000/api/owners', {
+            await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/owners`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

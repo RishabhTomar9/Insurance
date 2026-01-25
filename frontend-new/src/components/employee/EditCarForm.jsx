@@ -13,7 +13,7 @@ const EditCarForm = ({ car, onUpdate, onCancel }) => {
 
         try {
             const token = await auth.currentUser.getIdToken();
-            await fetch(`http://localhost:3000/api/cars/${car._id}`, {
+            await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/cars/${car._id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

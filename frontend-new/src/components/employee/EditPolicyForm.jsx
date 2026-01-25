@@ -15,7 +15,7 @@ const EditPolicyForm = ({ policy, onUpdate, onCancel, cars, owners }) => {
 
         try {
             const token = await auth.currentUser.getIdToken();
-            await fetch(`http://localhost:3000/api/policies/${policy._id}`, {
+            await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/policies/${policy._id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

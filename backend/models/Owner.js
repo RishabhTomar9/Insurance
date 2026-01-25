@@ -13,6 +13,23 @@ const ownerSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    email: {
+        type: String,
+        required: true,
+    },
+    aadharCard: {
+        type: String,
+        required: true,
+    },
+    drivingLicense: {
+        type: String,
+        required: true,
+    },
+    employeeId: {
+        type: String,
+        required: true,
+        index: true
+    },
 }, {
     timestamps: true,
 });

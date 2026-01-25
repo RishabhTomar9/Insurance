@@ -1,26 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { auth } from '../../services/firebase';
 import EditEmployeeForm from './EditEmployeeForm';
+import { useToast } from '../../contexts/ToastContext';
+import { useConfirmed } from '../../contexts/DialogContext';
 
 const EmployeeList = () => {
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const { addToast } = useToast();
+    const { showConfirm } = useConfirmed();
     const [editingEmployee, setEditingEmployee] = useState(null);
 
     const fetchEmployees = async () => {
         setLoading(true);
         try {
             const token = await auth.currentUser.getIdToken();
-            const response = await fetch('http://localhost:3000/api/users', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/users`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
             const data = await response.json();
             setEmployees(data);
+            setEmployees(data);
         } catch (error) {
-            setError('Error fetching employees');
+            addToast('Error fetching employees', 'error');
         }
         setLoading(false);
     };
@@ -29,27 +33,39 @@ const EmployeeList = () => {
         fetchEmployees();
     }, []);
 
-    const handleDeactivate = async (uid) => {
-        setError('');
+    const handleStatusChange = async (uid, newStatus) => {
+        if (newStatus === 'Deleted') {
+            const confirmed = await showConfirm(
+                'Delete Employee Account',
+                'Are you sure you want to delete this employee? This will revoke their access immediately.',
+                'danger'
+            );
+            if (!confirmed) {
+                fetchEmployees();
+                return;
+            }
+        }
+
         try {
             const token = await auth.currentUser.getIdToken();
-            const response = await fetch('http://localhost:3000/api/manager/employee/disable', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/manager/employee/status`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ uid })
+                body: JSON.stringify({ uid, status: newStatus })
             });
 
             if (response.ok) {
+                addToast(`Status updated to ${newStatus}`, 'success');
                 fetchEmployees();
             } else {
                 const data = await response.json();
-                setError(data.message || 'Error deactivating employee');
+                addToast(data.message || 'Error updating status', 'error');
             }
         } catch (error) {
-            setError('Error deactivating employee');
+            addToast('Error updating status', 'error');
         }
     };
 
@@ -59,65 +75,49 @@ const EmployeeList = () => {
     };
 
     if (loading) {
-        return <p>Loading employees...</p>;
+        return <div className="p-8 text-center text-slate-500">Loading employees...</div>;
     }
 
     return (
-        <div style={{
-            backgroundColor: '#0f0f1a',
-            padding: '2rem',
-            borderRadius: '10px',
-        }}>
-            <h2 style={{ marginBottom: '1rem' }}>Employee List</h2>
-            {error && <p style={{ color: '#e74c3c' }}>{error}</p>}
-            <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white' }}>
-                <thead>
-                    <tr style={{ borderBottom: '1px solid #6c5ce7' }}>
-                        <th style={{ padding: '12px 15px', textAlign: 'left' }}>Name</th>
-                        <th style={{ padding: '12px 15px', textAlign: 'left' }}>Email</th>
-                        <th style={{ padding: '12px 15px', textAlign: 'left' }}>Employee ID</th>
-                        <th style={{ padding: '12px 15px', textAlign: 'left' }}>Status</th>
-                        <th style={{ padding: '12px 15px', textAlign: 'left' }}>Actions</th>
+        <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                    <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Email</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Employee ID</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody className="bg-white divide-y divide-slate-200">
                     {employees.map(employee => (
-                        <tr key={employee.uid} style={{ borderBottom: '1px solid #1a1a2e' }}>
-                            <td style={{ padding: '12px 15px' }}>{employee.name}</td>
-                            <td style={{ padding: '12px 15px' }}>{employee.email}</td>
-                            <td style={{ padding: '12px 15px' }}>{employee.employeeId}</td>
-                            <td style={{ padding: '12px 15px' }}>
-                                <span style={{
-                                    backgroundColor: employee.disabled ? '#e74c3c' : '#2ecc71',
-                                    padding: '5px 10px',
-                                    borderRadius: '5px',
-                                    color: 'white'
-                                }}>
-                                    {employee.disabled ? 'Disabled' : 'Active'}
-                                </span>
+                        <tr key={employee.uid} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{employee.name}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{employee.email}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 font-mono">{employee.employeeId}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                                <select
+                                    value={employee.status || (employee.disabled ? 'Deleted' : 'Active')}
+                                    onChange={(e) => handleStatusChange(employee.uid, e.target.value)}
+                                    className={`px-3 py-1 text-xs font-semibold rounded-full border-0 focus:ring-2 focus:ring-indigo-500 cursor-pointer ${(employee.status === 'Active' || (!employee.status && !employee.disabled)) ? 'bg-emerald-100 text-emerald-800' :
+                                        (employee.status === 'On Leave') ? 'bg-amber-100 text-amber-800' :
+                                            'bg-red-100 text-red-800'
+                                        }`}
+                                >
+                                    <option value="Active" className="bg-white text-slate-800">Active</option>
+                                    <option value="On Leave" className="bg-white text-slate-800">On Leave</option>
+                                    <option value="Deleted" className="bg-white text-slate-800">Deleted</option>
+                                </select>
                             </td>
-                            <td style={{ padding: '12px 15px' }}>
-                                <button onClick={() => setEditingEmployee(employee)} style={{
-                                    backgroundColor: '#3498db',
-                                    color: '#fff',
-                                    padding: '8px 12px',
-                                    border: 'none',
-                                    borderRadius: '5px',
-                                    cursor: 'pointer',
-                                    marginRight: '5px',
-                                    fontWeight: 500,
-                                }}>Edit</button>
-                                {!employee.disabled && (
-                                    <button onClick={() => handleDeactivate(employee.uid)} style={{
-                                        backgroundColor: '#e74c3c',
-                                        color: '#fff',
-                                        padding: '8px 12px',
-                                        border: 'none',
-                                        borderRadius: '5px',
-                                        cursor: 'pointer',
-                                        fontWeight: 500,
-                                    }}>Deactivate</button>
-                                )}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button
+                                    onClick={() => setEditingEmployee(employee)}
+                                    className="text-indigo-600 hover:text-indigo-900 mr-4"
+                                >
+                                    Edit
+                                </button>
+
                             </td>
                         </tr>
                     ))}
@@ -135,4 +135,3 @@ const EmployeeList = () => {
 };
 
 export default EmployeeList;
-

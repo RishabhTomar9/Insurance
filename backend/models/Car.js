@@ -12,6 +12,27 @@ const carSchema = new mongoose.Schema({
     engineNumber: {
         type: String,
         required: true,
+        immutable: true // Mongoose immutable property
+    },
+    chassisNumber: {
+        type: String,
+        required: true,
+        immutable: true
+    },
+    make: { type: String, required: true },
+    model: { type: String, required: true },
+    manufacturingYear: { type: Number, required: true },
+    fuelType: { type: String, enum: ['Petrol', 'Diesel', 'Electric', 'Hybrid', 'CNG'], required: true },
+    registrationDate: { type: Date, required: true },
+    previousOwners: [{
+        name: String,
+        phone: String,
+        period: String
+    }],
+    currentInsuranceStatus: { // To track if it has valid insurance
+        type: String,
+        enum: ['Active', 'Expired', 'None'],
+        default: 'None'
     },
     employeeId: {
         type: String,

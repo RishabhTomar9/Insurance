@@ -1,169 +1,89 @@
 import React, { useState, useEffect } from 'react';
 import { auth } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import AddCarForm from '../components/employee/AddCarForm';
-import AddOwnerForm from '../components/employee/AddOwnerForm';
-import AddPolicyForm from '../components/employee/AddPolicyForm';
-import EditCarForm from '../components/employee/EditCarForm';
-import EditOwnerForm from '../components/employee/EditOwnerForm';
-import EditPolicyForm from '../components/employee/EditPolicyForm';
+// Reusing our standardized components for consistent UI since functionality is identical
+import ManagerCars from './manager/ManagerCars';
+import ManagerOwners from './manager/ManagerOwners';
+import ManagerPolicies from './manager/ManagerPolicies';
 
 const EmployeeDashboard = () => {
     const { currentUser } = useAuth();
-    const [cars, setCars] = useState([]);
-    const [owners, setOwners] = useState([]);
-    const [policies, setPolicies] = useState([]);
-    const [editingCar, setEditingCar] = useState(null);
-    const [editingOwner, setEditingOwner] = useState(null);
-    const [editingPolicy, setEditingPolicy] = useState(null);
-
-    const fetchData = async () => {
-        if (currentUser) {
-            const token = await auth.currentUser.getIdToken();
-            const headers = { 'Authorization': `Bearer ${token}` };
-
-            const [carsRes, ownersRes, policiesRes] = await Promise.all([
-                fetch('http://localhost:3000/api/cars', { headers }),
-                fetch('http://localhost:3000/api/owners', { headers }),
-                fetch('http://localhost:3000/api/policies', { headers }),
-            ]);
-
-            const carsData = await carsRes.json();
-            const ownersData = await ownersRes.json();
-            const policiesData = await policiesRes.json();
-
-            setCars(carsData);
-            setOwners(ownersData);
-            setPolicies(policiesData);
-        }
-    };
+    const [stats, setStats] = useState({ cars: 0, owners: 0, policies: 0 });
 
     useEffect(() => {
-        fetchData();
+        const fetchStats = async () => {
+            if (currentUser) {
+                try {
+                    const token = await auth.currentUser.getIdToken();
+                    const headers = { 'Authorization': `Bearer ${token}` };
+
+                    const [carsRes, ownersRes, policiesRes] = await Promise.all([
+                        fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/cars`, { headers }),
+                        fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/owners`, { headers }),
+                        fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/policies`, { headers })
+                    ]);
+
+                    const cars = await carsRes.json();
+                    const owners = await ownersRes.json();
+                    const policies = await policiesRes.json();
+
+                    setStats({
+                        cars: cars.length || 0,
+                        owners: owners.length || 0,
+                        policies: policies.length || 0
+                    });
+                } catch (e) { console.error(e); }
+            }
+        };
+        fetchStats();
     }, [currentUser]);
 
-    const handleDelete = async (collectionName, id) => {
-        try {
-            const token = await auth.currentUser.getIdToken();
-            await fetch(`http://localhost:3000/api/${collectionName}/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` },
-            });
-            fetchData();
-        } catch (error) {
-            console.error(`Error deleting ${collectionName}: `, error);
-        }
-    };
-
-    const handleUpdate = () => {
-        setEditingCar(null);
-        setEditingOwner(null);
-        setEditingPolicy(null);
-        fetchData();
-    };
-
+    const StatCard = ({ title, value, color, icon }) => (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">{title}</h3>
+                    <p className="mt-2 text-3xl font-bold text-slate-800">{value}</p>
+                </div>
+                <div className={`p-4 rounded-full ${color}`}>
+                    {icon}
+                </div>
+            </div>
+        </div>
+    );
 
     return (
-        <div style={{
-            backgroundColor: '#1a1a2e',
-            color: 'white',
-            minHeight: '100vh',
-            padding: '2rem',
-            fontFamily: "'Poppins', sans-serif",
-        }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h1>Employee Dashboard</h1>
-                <button onClick={() => auth.signOut()} style={{
-                    backgroundColor: '#e74c3c',
-                    color: '#fff',
-                    padding: '10px 15px',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontWeight: 500,
-                }}>Logout</button>
+        <div className="space-y-6">
+            <div>
+                <h1 className="text-2xl font-bold text-slate-800">My Dashboard</h1>
+                <p className="text-slate-500">Track your performance and manage client portfolios.</p>
             </div>
-            <div style={{
-                backgroundColor: '#0f0f1a',
-                padding: '2rem',
-                borderRadius: '10px',
-                marginBottom: '1rem'
-            }}>
-                <h2>My Performance</h2>
-                <p>Total Policies Created: {policies.length}</p>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
-                <AddCarForm onAdd={fetchData} />
-                <AddOwnerForm onAdd={fetchData} />
-                <AddPolicyForm onAdd={fetchData} cars={cars} owners={owners} />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem', marginTop: '2rem' }}>
-                <div style={{ backgroundColor: '#0f0f1a', padding: '2rem', borderRadius: '10px' }}>
-                    <h2>My Cars</h2>
-                    <ul>
-                        {cars.map(car => (
-                            <li key={car._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                {car.vehicleNumber}
-                                <div>
-                                    <button onClick={() => setEditingCar(car)} style={{ backgroundColor: '#3498db', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', marginRight: '5px' }}>Edit</button>
-                                    <button onClick={() => handleDelete('cars', car._id)} style={{ backgroundColor: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>Delete</button>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-                <div style={{ backgroundColor: '#0f0f1a', padding: '2rem', borderRadius: '10px' }}>
-                    <h2>Owners</h2>
-                    <ul>
-                        {owners.map(owner => (
-                            <li key={owner._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                {owner.name}
-                                <div>
-                                    <button onClick={() => setEditingOwner(owner)} style={{ backgroundColor: '#3498db', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', marginRight: '5px' }}>Edit</button>
-                                    <button onClick={() => handleDelete('owners', owner._id)} style={{ backgroundColor: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>Delete</button>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-                <div style={{ backgroundColor: '#0f0f1a', padding: '2rem', borderRadius: '10px' }}>
-                    <h2>My Policies</h2>
-                    <ul>
-                        {policies.map(policy => (
-                            <li key={policy._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                {policy.policyType}
-                                <div>
-                                    <button onClick={() => setEditingPolicy(policy)} style={{ backgroundColor: '#3498db', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', marginRight: '5px' }}>Edit</button>
-                                    <button onClick={() => handleDelete('policies', policy._id)} style={{ backgroundColor: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>Delete</button>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            </div>
-            {editingCar && (
-                <EditCarForm
-                    car={editingCar}
-                    onUpdate={handleUpdate}
-                    onCancel={() => setEditingCar(null)}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <StatCard
+                    title="My Policies Sold"
+                    value={stats.policies}
+                    color="bg-emerald-100 text-emerald-600"
+                    icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>}
                 />
-            )}
-            {editingOwner && (
-                <EditOwnerForm
-                    owner={editingOwner}
-                    onUpdate={handleUpdate}
-                    onCancel={() => setEditingOwner(null)}
+                <StatCard
+                    title="Vehicles Registered"
+                    value={stats.cars}
+                    color="bg-blue-100 text-blue-600"
+                    icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>}
                 />
-            )}
-            {editingPolicy && (
-                <EditPolicyForm
-                    policy={editingPolicy}
-                    onUpdate={handleUpdate}
-                    onCancel={() => setEditingPolicy(null)}
-                    cars={cars}
-                    owners={owners}
+                <StatCard
+                    title="Clients Managed"
+                    value={stats.owners}
+                    color="bg-orange-100 text-orange-600"
+                    icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>}
                 />
-            )}
+            </div>
+
+            <div className="bg-white p-8 rounded-xl border border-slate-200 text-center">
+                <h3 className="text-lg font-medium text-slate-800 mb-2">Platform Navigation</h3>
+                <p className="text-slate-500">Use the sidebar to navigate between Cars, Owners, and Policies management.</p>
+            </div>
         </div>
     );
 };

@@ -12,8 +12,9 @@ const policySchema = new mongoose.Schema({
         required: true,
     },
     policyType: {
-        type: String,
+        type: String, // 'Comprehensive' (First Party), 'Third Party Liability' (Third Party)
         required: true,
+        enum: ['Comprehensive', 'Third Party Liability', 'Zero Depreciation', 'Own Damage']
     },
     premiumAmount: {
         type: Number,
@@ -23,6 +24,9 @@ const policySchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    policyStartDate: { type: Date, default: Date.now },
+    policyEndDate: { type: Date }, // Should be calculated based on duration
+    coverageDetails: { type: String }, // Optional notes on specific coverage inclusions
     employeeId: {
         type: String,
         required: true,

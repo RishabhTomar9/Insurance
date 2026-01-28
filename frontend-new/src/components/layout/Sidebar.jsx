@@ -48,7 +48,7 @@ const Sidebar = () => {
                 )}
 
                 <div className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Resources</div>
-                <NavItem to={role === 'manager' ? "/manager/cars" : "/employee/cars"} icon={CarIcon} label="Cars" />
+                <NavItem to={role === 'manager' ? "/manager/cars" : "/employee/cars"} icon={CarIcon} label="Vehicles" />
                 <NavItem to={role === 'manager' ? "/manager/owners" : "/employee/owners"} icon={UsersIcon} label="Owners" />
                 <NavItem to={role === 'manager' ? "/manager/policies" : "/employee/policies"} icon={FileIcon} label="Policies" />
             </nav>

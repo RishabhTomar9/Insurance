@@ -3,6 +3,9 @@ import { auth } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirmed } from '../../contexts/DialogContext';
+import { Plus, Edit2, Trash2, Car, Search, Filter } from 'lucide-react';
+import AddCarForm from '../../components/employee/AddCarForm';
+import EditCarForm from '../../components/employee/EditCarForm';
 
 const ManagerCars = () => {
     const { currentUser } = useAuth();
@@ -12,23 +15,8 @@ const ManagerCars = () => {
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [editId, setEditId] = useState(null); // Track which car is being edited
-
-    const initialFormState = {
-        make: '',
-        model: '',
-        manufacturingYear: new Date().getFullYear(),
-        fuelType: 'Petrol',
-        vehicleNumber: '',
-        chassisNumber: '',
-        engineNumber: '',
-        registrationDate: '',
-        previousOwners: [],
-        employeeId: ''
-    };
-
-    const [formData, setFormData] = useState(initialFormState);
-    const [prevOwnerInput, setPrevOwnerInput] = useState({ name: '', period: '' });
+    const [editingCar, setEditingCar] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const fetchCars = async () => {
         try {
@@ -65,67 +53,8 @@ const ManagerCars = () => {
         fetchEmployees();
     }, [currentUser]);
 
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
-    const addPreviousOwner = () => {
-        if (prevOwnerInput.name) {
-            setFormData(prev => ({
-                ...prev,
-                previousOwners: [...prev.previousOwners, { ...prevOwnerInput }]
-            }));
-            setPrevOwnerInput({ name: '', period: '' });
-        }
-    };
-
     const handleEdit = (car) => {
-        setEditId(car._id);
-        const formattedDate = car.registrationDate ? new Date(car.registrationDate).toISOString().split('T')[0] : '';
-        setFormData({
-            ...car,
-            registrationDate: formattedDate,
-            previousOwners: car.previousOwners || [],
-            employeeId: car.employeeId || ''
-        });
-        setIsAddModalOpen(true);
-    };
-
-    const handleCloseModal = () => {
-        setIsAddModalOpen(false);
-        setEditId(null);
-        setFormData(initialFormState);
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            const token = await auth.currentUser.getIdToken();
-            const url = editId
-                ? `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/cars/${editId}`
-                : `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/cars`;
-
-            const method = editId ? 'PUT' : 'POST';
-
-            const response = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
-            });
-
-            if (response.ok) {
-                handleCloseModal();
-                fetchCars();
-                addToast(editId ? 'Vehicle updated successfully' : 'Vehicle registered successfully', 'success');
-            } else {
-                addToast('Failed to save car. Check if fields are valid.', 'warning');
-            }
-        } catch (error) {
-            addToast('Error saving vehicle details', 'error');
-        }
+        setEditingCar(car);
     };
 
     const handleDelete = async (id) => {
@@ -150,164 +79,147 @@ const ManagerCars = () => {
         }
     };
 
-    if (loading) return <div className="p-8 text-center text-slate-500">Loading cars...</div>;
+    const filteredCars = cars.filter(car =>
+        car.vehicleNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        car.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        car.make?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (loading) return (
+        <div className="flex items-center justify-center h-64 text-slate-500 animate-pulse">
+            <Car size={32} className="mr-3" />
+            <span className="text-lg font-medium">Loading fleet data...</span>
+        </div>
+    );
+
+    const showForm = isAddModalOpen || editingCar;
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold text-slate-800">Vehicle Management</h1>
-                <button
-                    onClick={() => setIsAddModalOpen(true)}
-                    className="flex items-center space-x-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-lg shadow-blue-200"
-                >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
-                    <span>Register New Vehicle</span>
-                </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {cars.map(car => (
-                    <div key={car._id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow group relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-2 opacity-50"><svg className="w-24 h-24 text-slate-100 transform rotate-12" fill="currentColor" viewBox="0 0 24 24"><path d="M19 19H5V8h14m-3-5v2.206l-1.6 .8L11 6h-5L2.6 10l-1.6-.8V7h3M3 19v2h2v-2h12v2h2v-2M5 12h14" /></svg></div>
-                        <div className="relative z-10">
-                            <div className="flex items-start justify-between mb-2">
-                                <span className="px-2 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded uppercase">{car.fuelType}</span>
-                                <div className="flex space-x-2">
-                                    <button onClick={() => handleEdit(car)} className="text-slate-300 hover:text-blue-500 transition-colors" title="Edit">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                                    </button>
-                                    <button onClick={() => handleDelete(car._id)} className="text-slate-300 hover:text-red-500 transition-colors" title="Delete">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                    </button>
+        <div className="relative min-h-screen bg-slate-50">
+            {/* List View */}
+            {!showForm && (
+                <div className="space-y-8 animate-fadeIn p-6">
+                    {/* Header */}
+                    <div className="flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                        <div>
+                            <h1 className="text-3xl font-bold text-slate-800 mb-2">Vehicle Management</h1>
+                            <p className="text-slate-500">Manage fleet, track assignments, and details.</p>
+                        </div>
+                        <div className="flex items-center space-x-4 mt-4 md:mt-0 w-full md:w-auto">
+                            <div className="relative group w-full md:w-64">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Search className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                                 </div>
+                                <input
+                                    type="text"
+                                    placeholder="Search vehicles..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all shadow-sm"
+                                />
                             </div>
-                            <h3 className="text-xl font-bold text-slate-800">{car.vehicleNumber}</h3>
-                            <p className="text-sm text-slate-500 mb-4">{car.make} {car.model} ({car.manufacturingYear})</p>
-
-                            <div className="space-y-2 border-t border-slate-100 pt-4">
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-slate-400">Chassis No</span>
-                                    <span className="font-mono text-slate-600">{car.chassisNumber}</span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-slate-400">Engine No</span>
-                                    <span className="font-mono text-slate-600">{car.engineNumber}</span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-slate-400">Owners History</span>
-                                    <span className="font-medium text-slate-600">{car.previousOwners?.length || 0} Previous</span>
-                                </div>
-                            </div>
+                            <button
+                                onClick={() => setIsAddModalOpen(true)}
+                                className="flex items-center space-x-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all shadow-lg shadow-indigo-200 active:scale-95 whitespace-nowrap font-medium"
+                            >
+                                <Plus size={20} />
+                                <span>Add New Vehicle</span>
+                            </button>
                         </div>
                     </div>
-                ))}
-            </div>
 
-            {/* Modal */}
-            {isAddModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up">
-                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                            <div>
-                                <h3 className="text-xl font-bold text-slate-800">{editId ? 'Edit Vehicle' : 'Register Vehicle'}</h3>
-                                <p className="text-sm text-slate-500">{editId ? 'Update vehicle details' : 'Enter comprehensive vehicle details'}</p>
-                            </div>
-                            <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
-                        </div>
-                        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+                    {/* Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {filteredCars.map(car => (
+                            <div key={car._id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-indigo-300 transition-all duration-300 group relative overflow-hidden flex flex-col">
+                                <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-10 transition-opacity">
+                                    <Car size={100} className="text-indigo-900 transform rotate-12 translate-x-4 -translate-y-4" />
+                                </div>
 
-                            {/* Basic Details */}
-                            {currentUser?.role === 'manager' && (
-                                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-6">
-                                    <label className="block text-sm font-bold text-blue-700 mb-2">Assign to Employee</label>
-                                    <select
-                                        name="employeeId"
-                                        value={formData.employeeId}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    >
-                                        <option value="">-- Assign to Me --</option>
-                                        {employees.map(emp => (
-                                            <option key={emp.uid} value={emp.uid}>{emp.email}</option>
-                                        ))}
-                                    </select>
-                                    <p className="text-xs text-blue-400 mt-1">Leave blank to keep ownership assigned to yourself.</p>
-                                </div>
-                            )}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Registration Number</label>
-                                    <input name="vehicleNumber" value={formData.vehicleNumber} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase font-mono" placeholder="MH-01-AB-1234" required />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Registration Date</label>
-                                    <input type="date" name="registrationDate" value={formData.registrationDate} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Make (Brand)</label>
-                                    <input name="make" value={formData.make} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. Toyota" required />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Model</label>
-                                    <input name="model" value={formData.model} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. Fortuner" required />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Fuel Type</label>
-                                    <select name="fuelType" value={formData.fuelType} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                                        <option>Petrol</option>
-                                        <option>Diesel</option>
-                                        <option>CNG</option>
-                                        <option>Electric</option>
-                                        <option>Hybrid</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Manufacturing Year</label>
-                                    <input type="number" name="manufacturingYear" value={formData.manufacturingYear} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" min="1900" max="2100" required />
-                                </div>
-                            </div>
-
-                            {/* Immutable Technical Details */}
-                            <div className={`bg-slate-50 p-4 rounded-lg border border-slate-200 ${editId ? 'opacity-70' : ''}`}>
-                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Critical Identification (Immutable)</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Chassis Number {editId && <span className="text-xs text-red-500">(Not Editable)</span>}</label>
-                                        <input name="chassisNumber" value={formData.chassisNumber} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none bg-white font-mono" placeholder="Unique Chassis ID" required disabled={!!editId} />
+                                <div className="relative z-10 flex-1">
+                                    <div className="flex items-start justify-between mb-4">
+                                        <span className={`px-2.5 py-1 text-xs font-bold rounded-full uppercase tracking-wider ${car.category === 'Commercial' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                                            }`}>
+                                            {car.category || 'Private'}
+                                        </span>
+                                        <div className="flex space-x-1">
+                                            <button
+                                                onClick={() => handleEdit(car)}
+                                                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                title="Edit Details"
+                                            >
+                                                <Edit2 size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(car._id)}
+                                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                title="Delete Record"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Engine Number {editId && <span className="text-xs text-red-500">(Not Editable)</span>}</label>
-                                        <input name="engineNumber" value={formData.engineNumber} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none bg-white font-mono" placeholder="Unique Engine ID" required disabled={!!editId} />
+
+                                    <h3 className="text-xl font-bold text-slate-800 mb-1 truncate">{car.vehicleNumber}</h3>
+                                    <p className="text-sm text-slate-500 mb-6">{car.make} {car.model}</p>
+
+                                    <div className="space-y-3 pt-4 border-t border-slate-100">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-slate-500">Engine CC</span>
+                                            <span className="font-mono text-slate-700 font-medium">{car.cc || 'N/A'}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-slate-500">Chassis</span>
+                                            <span className="font-mono text-slate-700 font-medium truncate max-w-[120px]" title={car.chassisNumber}>{car.chassisNumber}</span>
+                                        </div>
+                                        {car.agentDetails?.name && (
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-slate-500">Agent</span>
+                                                <span className="font-medium text-slate-700">{car.agentDetails.name}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
+                        ))}
 
-                            {/* Past Owners */}
-                            <div className="border border-slate-200 rounded-lg p-4">
-                                <h4 className="text-sm font-bold text-slate-800 mb-2">Vehicle History (Past Owners)</h4>
-                                <div className="flex gap-2 mb-2">
-                                    <input placeholder="Owner Name" value={prevOwnerInput.name} onChange={e => setPrevOwnerInput({ ...prevOwnerInput, name: e.target.value })} className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm" />
-                                    <input placeholder="Period (e.g. 2018-2022)" value={prevOwnerInput.period} onChange={e => setPrevOwnerInput({ ...prevOwnerInput, period: e.target.value })} className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm" />
-                                    <button type="button" onClick={addPreviousOwner} className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-sm">Add</button>
-                                </div>
-                                <ul className="space-y-1">
-                                    {formData.previousOwners.map((owner, idx) => (
-                                        <li key={idx} className="text-xs text-slate-600 flex justify-between bg-slate-50 p-2 rounded">
-                                            <span>{owner.name}</span>
-                                            <span className="text-slate-400">{owner.period}</span>
-                                        </li>
-                                    ))}
-                                    {formData.previousOwners.length === 0 && <li className="text-xs text-slate-400 italic">No previous owners recorded.</li>}
-                                </ul>
+                        {filteredCars.length === 0 && (
+                            <div className="col-span-full py-20 text-center text-slate-500 bg-white rounded-2xl border border-dashed border-slate-300">
+                                <Car size={48} className="mx-auto mb-4 text-slate-300" />
+                                <p className="text-lg">No vehicles found matching your search.</p>
                             </div>
-
-                            <div className="pt-4 border-t border-slate-100">
-                                <button type="submit" className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-lg transition-all transform hover:scale-[1.01] shadow-lg">
-                                    {editId ? 'Update Vehicle Details' : 'Register Vehicle in System'}
-                                </button>
-                            </div>
-                        </form>
+                        )}
                     </div>
+                </div>
+            )}
+
+            {/* Form Flip View */}
+            {showForm && (
+                <div className="absolute inset-0 z-50 bg-white animate-flipUp min-h-screen overflow-y-auto">
+                    {isAddModalOpen && (
+                        <AddCarForm
+                            onAdd={() => {
+                                setIsAddModalOpen(false);
+                                fetchCars();
+                            }}
+                            onClose={() => setIsAddModalOpen(false)}
+                            employees={employees}
+                            isManager={currentUser?.role === 'manager'}
+                        />
+                    )}
+
+                    {editingCar && (
+                        <EditCarForm
+                            car={editingCar}
+                            onUpdate={() => {
+                                setEditingCar(null);
+                                fetchCars();
+                            }}
+                            onCancel={() => setEditingCar(null)}
+                            employees={employees}
+                            isManager={currentUser?.role === 'manager'}
+                        />
+                    )}
                 </div>
             )}
         </div>

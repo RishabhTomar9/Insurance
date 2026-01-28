@@ -1,80 +1,258 @@
 import React, { useState } from 'react';
 import { auth } from '../../services/firebase';
+import { X, User, Phone, MapPin, Mail, CreditCard, FileText } from 'lucide-react';
 
-const AddOwnerForm = ({ onAdd }) => {
-    const [name, setName] = useState('');
-    const [address, setAddress] = useState('');
-    const [phone, setPhone] = useState('');
+const AddOwnerForm = ({ onAdd, onCancel, employees = [], isManager = false }) => {
+    const [formData, setFormData] = useState({
+        ownerName: '',
+        mobileNo: '',
+        address: '',
+        email: '',
+        aadharCard: '',
+        drivingLicense: '',
+        employeeId: ''
+    });
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
 
-    const handleAddOwner = async (e) => {
+    const handleChange = (e) => {
+        setFormData({
+            ...formData,
+            [e.target.name]: e.target.value
+        });
+    };
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
-        setSuccess('');
+        setLoading(true);
 
         try {
             const token = await auth.currentUser.getIdToken();
-            await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/owners`, {
+            const backendData = {
+                name: formData.ownerName,
+                phone: formData.mobileNo,
+                address: formData.address,
+                email: formData.email,
+                aadharCard: formData.aadharCard,
+                drivingLicense: formData.drivingLicense,
+                employeeId: formData.employeeId
+            };
+
+            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/owners`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ name, address, phone })
+                body: JSON.stringify(backendData)
             });
-            setSuccess('Owner added successfully!');
-            setName('');
-            setAddress('');
-            setPhone('');
+
+            if (!response.ok) throw new Error('Failed to add owner');
+
             onAdd();
         } catch (error) {
-            setError('Error adding owner');
+            console.error(error);
+            setError('Error adding owner. Please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-        <div style={{ backgroundColor: '#0f0f1a', padding: '2rem', borderRadius: '10px' }}>
-            <h2 style={{ marginBottom: '1rem' }}>Add Owner</h2>
-            <form onSubmit={handleAddOwner} style={{
-                display: 'flex',
-                flexDirection: 'column',
-                width: '300px',
-            }}>
-                <input
-                    type="text"
-                    placeholder="Name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    style={{ padding: '10px', margin: '5px 0', borderRadius: '5px', border: '1px solid #6c5ce7', backgroundColor: '#1a1a2e', color: 'white' }}
-                />
-                <input
-                    type="text"
-                    placeholder="Address"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    style={{ padding: '10px', margin: '5px 0', borderRadius: '5px', border: '1px solid #6c5ce7', backgroundColor: '#1a1a2e', color: 'white' }}
-                />
-                <input
-                    type="text"
-                    placeholder="Phone"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    style={{ padding: '10px', margin: '5px 0', borderRadius: '5px', border: '1px solid #6c5ce7', backgroundColor: '#1a1a2e', color: 'white' }}
-                />
-                <button type="submit" style={{
-                    backgroundColor: '#6c5ce7',
-                    color: '#fff',
-                    padding: '10px 15px',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontWeight: 500,
-                    marginTop: '1rem'
-                }}>Add Owner</button>
-            </form>
-            {error && <p style={{ color: '#e74c3c', marginTop: '1rem' }}>{error}</p>}
-            {success && <p style={{ color: '#2ecc71', marginTop: '1rem' }}>{success}</p>}
+        <div className="bg-white w-full h-full min-h-screen">
+            <div className="max-w-5xl mx-auto px-6 py-12">
+                <div className="flex justify-between items-center mb-10 pb-6 border-b border-slate-100">
+                    <div>
+                        <h2 className="text-3xl font-bold text-slate-800 tracking-tight flex items-center">
+                            <span className="bg-indigo-100 text-indigo-600 p-3 rounded-xl mr-4 shadow-sm">
+                                <User size={24} />
+                            </span>
+                            Add New Owner
+                        </h2>
+                        <p className="text-slate-500 mt-2 ml-[84px] text-lg">Enter owner details and assign management.</p>
+                    </div>
+
+                    <button
+                        onClick={onCancel}
+                        className="bg-slate-50 text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-3 rounded-full transition-all border border-slate-100 hover:shadow-md group"
+                        title="Close Form"
+                    >
+                        <X size={28} className="group-hover:rotate-90 transition-transform duration-300" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-8 animate-fadeIn">
+                    {/* Employee Assignment (Manager Only) */}
+                    {isManager && (
+                        <div className="bg-indigo-50/50 p-8 rounded-2xl border border-indigo-100">
+                            <div className="flex items-start gap-4">
+                                <div className="mt-1 bg-indigo-100 p-2 rounded-lg">
+                                    <User className="w-6 h-6 text-indigo-600" />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-lg font-bold text-indigo-900 mb-2">Assign to Employee</label>
+                                    <div className="relative">
+                                        <select
+                                            name="employeeId"
+                                            value={formData.employeeId}
+                                            onChange={handleChange}
+                                            className="w-full bg-white border border-indigo-200 rounded-xl p-4 pl-5 text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none appearance-none font-medium"
+                                        >
+                                            <option value="">-- Assign to Me (Current User) --</option>
+                                            {employees.map(emp => (
+                                                <option key={emp.uid} value={emp.uid}>{emp.email}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <p className="text-indigo-400 mt-2 text-sm ml-1">Leave blank to assign to yourself.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Owner Personal Information */}
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
+                            <span className="w-1.5 h-8 bg-indigo-600 rounded-full mr-3"></span>
+                            Personal Information
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="contact-input-group group">
+                                <label className="block text-sm font-semibold text-slate-500 mb-2 group-focus-within:text-indigo-600 transition-colors uppercase tracking-wider">Full Name *</label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        name="ownerName"
+                                        required
+                                        value={formData.ownerName}
+                                        onChange={handleChange}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 pl-12 text-slate-800 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none font-medium"
+                                        placeholder="e.g. John Doe"
+                                    />
+                                    <User className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                                </div>
+                            </div>
+
+                            <div className="contact-input-group group">
+                                <label className="block text-sm font-semibold text-slate-500 mb-2 group-focus-within:text-indigo-600 transition-colors uppercase tracking-wider">Mobile Number *</label>
+                                <div className="relative">
+                                    <input
+                                        type="tel"
+                                        name="mobileNo"
+                                        required
+                                        value={formData.mobileNo}
+                                        onChange={handleChange}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 pl-12 text-slate-800 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none font-medium"
+                                        placeholder="10-digit number"
+                                    />
+                                    <Phone className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                                </div>
+                            </div>
+
+                            <div className="contact-input-group group md:col-span-2">
+                                <label className="block text-sm font-semibold text-slate-500 mb-2 group-focus-within:text-indigo-600 transition-colors uppercase tracking-wider">Address *</label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        name="address"
+                                        required
+                                        value={formData.address}
+                                        onChange={handleChange}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 pl-12 text-slate-800 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none font-medium"
+                                        placeholder="Complete residential address"
+                                    />
+                                    <MapPin className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                                </div>
+                            </div>
+
+                            <div className="contact-input-group group">
+                                <label className="block text-sm font-semibold text-slate-500 mb-2 group-focus-within:text-indigo-600 transition-colors uppercase tracking-wider">Email Address *</label>
+                                <div className="relative">
+                                    <input
+                                        type="email"
+                                        name="email"
+                                        required
+                                        value={formData.email}
+                                        onChange={handleChange}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 pl-12 text-slate-800 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none font-medium"
+                                        placeholder="john@example.com"
+                                    />
+                                    <Mail className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Official Documents */}
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center pt-6 border-t border-slate-100">
+                            <span className="w-1.5 h-8 bg-green-500 rounded-full mr-3"></span>
+                            Official Documents
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="contact-input-group group">
+                                <label className="block text-sm font-semibold text-slate-500 mb-2 group-focus-within:text-indigo-600 transition-colors uppercase tracking-wider">Aadhar Card Number</label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        name="aadharCard"
+                                        value={formData.aadharCard}
+                                        onChange={handleChange}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 pl-12 text-slate-800 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none font-medium"
+                                        placeholder="12-digit UIDAI number"
+                                    />
+                                    <CreditCard className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                                </div>
+                            </div>
+
+                            <div className="contact-input-group group">
+                                <label className="block text-sm font-semibold text-slate-500 mb-2 group-focus-within:text-indigo-600 transition-colors uppercase tracking-wider">Driving License</label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        name="drivingLicense"
+                                        value={formData.drivingLicense}
+                                        onChange={handleChange}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 pl-12 text-slate-800 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none font-medium"
+                                        placeholder="License number"
+                                    />
+                                    <FileText className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="pt-8 border-t border-slate-100 flex items-center justify-between">
+                        <div className="flex-1">
+                            {error && <p className="text-red-600 text-sm bg-red-50 py-2 px-4 rounded-lg border border-red-100 font-medium inline-block">{error}</p>}
+                        </div>
+                        <div className="flex justify-end space-x-6">
+                            <button
+                                type="button"
+                                onClick={onCancel}
+                                className="px-8 py-4 rounded-xl border-2 border-slate-100 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors font-bold bg-white text-lg"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="px-10 py-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-200 transition-all transform hover:-translate-y-1 active:translate-y-0 font-bold disabled:opacity-50 text-lg flex items-center"
+                            >
+                                {loading ? (
+                                    <>
+                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                        Saving...
+                                    </>
+                                ) : (
+                                    'Save Owner'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 };

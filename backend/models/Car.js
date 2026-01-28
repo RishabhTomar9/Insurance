@@ -38,6 +38,20 @@ const carSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    cc: {
+        type: Number,
+        required: true
+    },
+    category: {
+        type: String,
+        enum: ['Private', 'Commercial'],
+        required: true
+    },
+    agentDetails: {
+        name: { type: String },
+        mobile: { type: String },
+        email: { type: String }
+    }
 }, {
     timestamps: true,
 });

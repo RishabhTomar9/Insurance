@@ -48,11 +48,26 @@ const LoginPage = () => {
     const handleEmployeeLogin = async (e) => {
         e.preventDefault();
         setError('');
+
+        if (!email || !password) {
+            setError('Please enter both email and password.');
+            return;
+        }
+
         try {
             await signInWithEmailAndPassword(auth, email, password);
             navigate('/employee');
         } catch (error) {
-            setError(error.message);
+            console.error("Login Error Details:", error);
+            let msg = 'Failed to sign in.';
+            if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                msg = 'Invalid email or password.';
+            } else if (error.code === 'auth/too-many-requests') {
+                msg = 'Too many failed attempts. Please try again later.';
+            } else {
+                msg = error.message;
+            }
+            setError(msg);
         }
     };
 

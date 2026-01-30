@@ -14,6 +14,7 @@ const ManagerEmployees = lazy(() => import('./pages/manager/ManagerEmployees'));
 const ManagerOwners = lazy(() => import('./pages/manager/ManagerOwners'));
 const ManagerCars = lazy(() => import('./pages/manager/ManagerCars'));
 const ManagerPolicies = lazy(() => import('./pages/manager/ManagerPolicies'));
+const ManagerBanks = lazy(() => import('./pages/manager/ManagerBanks'));
 
 // Employee Pages
 const EmployeeDashboard = lazy(() => import('./pages/EmployeeDashboard'));
@@ -37,6 +38,7 @@ const App = () => {
                 <Route path="cars" element={<ManagerCars />} />
                 <Route path="owners" element={<ManagerOwners />} />
                 <Route path="policies" element={<ManagerPolicies />} />
+                <Route path="banks" element={<ManagerBanks />} />
               </Route>
             </Route>
 

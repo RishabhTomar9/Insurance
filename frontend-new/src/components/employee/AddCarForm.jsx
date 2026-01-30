@@ -201,15 +201,19 @@ const AddCarForm = ({ onAdd, onClose, employees = [], isManager = false }) => {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <div className="group">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Vehicle No. *</label>
-                                <input name="vehicleNumber" required value={vehicleData.vehicleNumber} onChange={handleVehicleChange} placeholder="MH-12-AB-1234" className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                <input name="vehicleNumber" required value={vehicleData.vehicleNumber} onChange={handleVehicleChange} placeholder="MH-12-AB-1234" className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none uppercase" />
                             </div>
                             <div className="group">
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Make *</label>
-                                <input name="make" required value={vehicleData.make} onChange={handleVehicleChange} placeholder="e.g. Toyota" className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Make (Brand) *</label>
+                                <input name="make" required value={vehicleData.make} onChange={handleVehicleChange} placeholder="e.g. Maruti Suzuki" className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
                             </div>
                             <div className="group">
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Model *</label>
-                                <input name="model" required value={vehicleData.model} onChange={handleVehicleChange} placeholder="e.g. Fortuner" className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Model (Product) *</label>
+                                <input name="model" required value={vehicleData.model} onChange={handleVehicleChange} placeholder="e.g. Alto 800" className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+                            </div>
+                            <div className="group">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Variant</label>
+                                <input name="variant" value={vehicleData.variant || ''} onChange={handleVehicleChange} placeholder="e.g. LXI" className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
                             </div>
                             <div className="group">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Fuel Type *</label>
@@ -222,16 +226,20 @@ const AddCarForm = ({ onAdd, onClose, employees = [], isManager = false }) => {
                                 <input type="number" name="manufacturingYear" required value={vehicleData.manufacturingYear} onChange={handleVehicleChange} className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
                             </div>
                             <div className="group">
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Reg Date *</label>
-                                <input type="date" name="registrationDate" required value={vehicleData.registrationDate} onChange={handleVehicleChange} className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Reg Year *</label>
+                                <input type="number" name="registrationYear" required value={vehicleData.registrationYear || new Date().getFullYear()} onChange={handleVehicleChange} className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+                            </div>
+                            <div className="group">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Reg Date</label>
+                                <input type="date" name="registrationDate" value={vehicleData.registrationDate} onChange={handleVehicleChange} className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
                             </div>
                             <div className="group">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Chassis No. *</label>
-                                <input name="chassisNumber" required value={vehicleData.chassisNumber} onChange={handleVehicleChange} className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                <input name="chassisNumber" required value={vehicleData.chassisNumber} onChange={handleVehicleChange} className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none uppercase" />
                             </div>
                             <div className="group">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Engine No. *</label>
-                                <input name="engineNumber" required value={vehicleData.engineNumber} onChange={handleVehicleChange} className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                <input name="engineNumber" required value={vehicleData.engineNumber} onChange={handleVehicleChange} className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none uppercase" />
                             </div>
                             <div className="group">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">CC *</label>
@@ -240,7 +248,7 @@ const AddCarForm = ({ onAdd, onClose, employees = [], isManager = false }) => {
                             <div className="group">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Category *</label>
                                 <select name="category" value={vehicleData.category} onChange={handleVehicleChange} className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
-                                    <option>Private</option><option>Commercial</option>
+                                    <option>Personal</option><option>Commercial</option>
                                 </select>
                             </div>
                         </div>

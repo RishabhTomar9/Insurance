@@ -53,10 +53,12 @@ router.get('/api/users/:uid', authMiddleware, async (req, res) => {
 const carRoutes = require('./cars');
 const ownerRoutes = require('./owners');
 const policyRoutes = require('./policies');
+const bankRoutes = require('./banks');
 
 router.use('/api/cars', authMiddleware, carRoutes);
 router.use('/api/owners', authMiddleware, ownerRoutes);
 router.use('/api/policies', authMiddleware, policyRoutes);
+router.use('/api/banks', authMiddleware, bankRoutes);
 
 router.use('/api/manager', authMiddleware, checkRole('manager'), managerRoutes);
 router.use('/api/employee', authMiddleware, checkRole('employee'), employeeRoutes);

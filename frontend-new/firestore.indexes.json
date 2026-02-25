@@ -1,0 +1,47 @@
+{
+    "indexes": [
+        {
+            "collectionGroup": "policies",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "employeeId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "cars",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "employeeId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "owners",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "employeeId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        }
+    ],
+    "fieldOverrides": []
+}

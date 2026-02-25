@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '../../services/firebase';
+import { collection, query, where, onSnapshot, doc, deleteDoc, orderBy } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirmed } from '../../contexts/DialogContext';
@@ -18,39 +19,33 @@ const ManagerCars = () => {
     const [editingCar, setEditingCar] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const fetchCars = async () => {
-        try {
-            const token = await auth.currentUser.getIdToken();
-            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/cars`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await response.json();
-            setCars(data);
-        } catch (error) {
-            console.error('Error fetching cars');
-            addToast('Failed to load vehicles', 'error');
-        }
-        setLoading(false);
-    };
-
-    const fetchEmployees = async () => {
-        if (currentUser?.role === 'manager') {
-            try {
-                const token = await auth.currentUser.getIdToken();
-                const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/users`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await response.json();
-                setEmployees(data);
-            } catch (error) {
-                console.error('Error fetching employees');
-            }
-        }
-    };
-
     useEffect(() => {
-        fetchCars();
-        fetchEmployees();
+        if (!currentUser) return;
+
+        const isManager = currentUser.role === 'manager';
+
+        // Cars Listener
+        const carsQuery = isManager
+            ? query(collection(db, 'cars'), orderBy('createdAt', 'desc'))
+            : query(collection(db, 'cars'), where('employeeId', '==', currentUser.uid), orderBy('createdAt', 'desc'));
+
+        const unsubCars = onSnapshot(carsQuery, (snap) => {
+            setCars(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setLoading(false);
+        });
+
+        // Employees Listener - only for managers
+        let unsubEmployees = () => { };
+        if (isManager) {
+            unsubEmployees = onSnapshot(collection(db, 'users'), (snap) => {
+                setEmployees(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+        }
+
+        return () => {
+            unsubCars();
+            unsubEmployees();
+        };
     }, [currentUser]);
 
     const handleEdit = (car) => {
@@ -66,12 +61,7 @@ const ManagerCars = () => {
         if (!confirmed) return;
 
         try {
-            const token = await auth.currentUser.getIdToken();
-            await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/cars/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            fetchCars();
+            await deleteDoc(doc(db, 'cars', id));
             addToast('Vehicle record deleted', 'info');
         } catch (error) {
             console.error(error);
@@ -86,9 +76,9 @@ const ManagerCars = () => {
     );
 
     if (loading) return (
-        <div className="flex items-center justify-center h-64 text-slate-500 animate-pulse">
+        <div className="flex items-center justify-center min-h-[400px] text-slate-500 animate-pulse">
             <Car size={32} className="mr-3" />
-            <span className="text-lg font-medium">Loading fleet data...</span>
+            <span className="text-lg font-medium">Syncing fleet data...</span>
         </div>
     );
 
@@ -131,7 +121,7 @@ const ManagerCars = () => {
                     {/* Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {filteredCars.map(car => (
-                            <div key={car._id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-indigo-300 transition-all duration-300 group relative overflow-hidden flex flex-col">
+                            <div key={car.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-indigo-300 transition-all duration-300 group relative overflow-hidden flex flex-col">
                                 <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-10 transition-opacity">
                                     <Car size={100} className="text-indigo-900 transform rotate-12 translate-x-4 -translate-y-4" />
                                 </div>
@@ -151,7 +141,7 @@ const ManagerCars = () => {
                                                 <Edit2 size={18} />
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(car._id)}
+                                                onClick={() => handleDelete(car.id)}
                                                 className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                                 title="Delete Record"
                                             >
@@ -159,6 +149,7 @@ const ManagerCars = () => {
                                             </button>
                                         </div>
                                     </div>
+
 
                                     <h3 className="text-xl font-bold text-slate-800 mb-1 truncate">{car.vehicleNumber}</h3>
                                     <p className="text-sm text-slate-500 mb-6">{car.make} {car.model}</p>
@@ -200,7 +191,6 @@ const ManagerCars = () => {
                         <AddCarForm
                             onAdd={() => {
                                 setIsAddModalOpen(false);
-                                fetchCars();
                             }}
                             onClose={() => setIsAddModalOpen(false)}
                             employees={employees}
@@ -213,13 +203,13 @@ const ManagerCars = () => {
                             car={editingCar}
                             onUpdate={() => {
                                 setEditingCar(null);
-                                fetchCars();
                             }}
                             onCancel={() => setEditingCar(null)}
                             employees={employees}
                             isManager={currentUser?.role === 'manager'}
                         />
                     )}
+
                 </div>
             )}
         </div>

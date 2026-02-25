@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '../../services/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../../services/firebase';
 import { X, FileText, Calendar, IndianRupee, Shield, Clock, Plus, Trash2, ChevronDown, ChevronUp, Briefcase, CreditCard, User, Landmark } from 'lucide-react';
 
 const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [], isManager = false }) => {
-    // Basic Details
+    // ... basic data init (no change needed in state init)
     const [basicData, setBasicData] = useState({
         employeeId: '',
         date: new Date().toISOString().split('T')[0],
@@ -60,7 +61,8 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
     // Effects
     useEffect(() => {
         if (basicData.carId) {
-            const car = cars.find(c => c._id === basicData.carId);
+            // Note: In Firebase migration, we should check both id and _id for compatibility
+            const car = cars.find(c => (c.id || c._id) === basicData.carId);
             if (car) {
                 if (car.agentDetails) {
                     setBasicData(prev => ({
@@ -136,11 +138,12 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
         setLoading(true);
 
         try {
-            const token = await auth.currentUser.getIdToken();
+            const user = auth.currentUser;
+            if (!user) throw new Error('Not authenticated');
 
             const payload = {
                 // Basic
-                employeeId: basicData.employeeId || (auth.currentUser ? auth.currentUser.uid : ''),
+                employeeId: basicData.employeeId || user.uid,
                 carId: basicData.carId,
                 ownerId: basicData.ownerId,
                 agentName: basicData.agentName,
@@ -149,11 +152,11 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
                 // Quotation
                 quotation: {
                     ...quotationData,
-                    insuredAmount: parseFloat(quotationData.insuredAmount),
-                    thirdPartyPremium: parseFloat(quotationData.thirdPartyPremium),
-                    odPremium: parseFloat(quotationData.odPremium),
-                    netPremium: parseFloat(quotationData.netPremium),
-                    actualPaymentAmount: parseFloat(quotationData.actualPaymentAmount)
+                    insuredAmount: parseFloat(quotationData.insuredAmount) || 0,
+                    thirdPartyPremium: parseFloat(quotationData.thirdPartyPremium) || 0,
+                    odPremium: parseFloat(quotationData.odPremium) || 0,
+                    netPremium: parseFloat(quotationData.netPremium) || 0,
+                    actualPaymentAmount: parseFloat(quotationData.actualPaymentAmount) || 0
                 },
 
                 // Policy
@@ -163,33 +166,26 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
                 policyStartDate: policyData.policyStartDate,
                 policyEndDate: policyData.policyEndDate,
                 policyType: policyData.policyType,
-                premiumAmount: parseFloat(policyData.finalPremium), // Required field
-                finalInsuredAmount: parseFloat(policyData.finalInsuredAmount),
-                finalThirdPartyPremium: parseFloat(policyData.finalThirdPartyPremium),
-                finalOdPremium: parseFloat(policyData.finalOdPremium),
-                finalPremium: parseFloat(policyData.finalPremium),
+                premiumAmount: parseFloat(policyData.finalPremium) || 0,
+                finalInsuredAmount: parseFloat(policyData.finalInsuredAmount) || 0,
+                finalThirdPartyPremium: parseFloat(policyData.finalThirdPartyPremium) || 0,
+                finalOdPremium: parseFloat(policyData.finalOdPremium) || 0,
+                finalPremium: parseFloat(policyData.finalPremium) || 0,
 
                 policyPaymentMode: policyData.policyPaymentMode,
                 paymentDifference: parseFloat(calculateDifference()),
 
                 // Lists
-                paymentsOut: paymentsOut.map(p => ({ ...p, amount: parseFloat(p.amount) })),
-                receiptsIn: receiptsIn.map(r => ({ ...r, amount: parseFloat(r.amount) }))
+                paymentsOut: paymentsOut.map(p => ({ ...p, amount: parseFloat(p.amount) || 0 })),
+                receiptsIn: receiptsIn.map(r => ({ ...r, amount: parseFloat(r.amount) || 0 })),
+
+                // Firestore Metadata
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
             };
 
-            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/policies`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.message || 'Failed to create policy');
-            }
+            // Add to Firestore collection
+            await addDoc(collection(db, 'policies'), payload);
 
             onAdd();
             if (onClose) onClose();
@@ -200,6 +196,7 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
             setLoading(false);
         }
     };
+
 
     return (
         <div className="bg-white w-full h-full min-h-screen overflow-y-auto">

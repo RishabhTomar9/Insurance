@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '../../services/firebase';
+import { collection, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 import EditEmployeeForm from './EditEmployeeForm';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirmed } from '../../contexts/DialogContext';
@@ -10,6 +11,7 @@ const PasswordCell = ({ tempPassword, passwordChanged }) => {
     const [copied, setCopied] = useState(false);
 
     const handleCopy = () => {
+        if (!tempPassword) return;
         navigator.clipboard.writeText(tempPassword);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
@@ -51,67 +53,48 @@ const PasswordCell = ({ tempPassword, passwordChanged }) => {
 };
 
 const EmployeeList = () => {
+
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(true);
     const { addToast } = useToast();
     const { showConfirm } = useConfirmed();
     const [editingEmployee, setEditingEmployee] = useState(null);
 
-    const fetchEmployees = async () => {
-        setLoading(true);
-        try {
-            const token = await auth.currentUser.getIdToken();
-            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/users`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            const data = await response.json();
-            setEmployees(data);
-            setEmployees(data);
-        } catch (error) {
-            addToast('Error fetching employees', 'error');
-        }
-        setLoading(false);
-    };
-
     useEffect(() => {
-        fetchEmployees();
+        // Real-time listener for all users (managers can see all users)
+        const unsub = onSnapshot(collection(db, 'users'), (snap) => {
+            setEmployees(snap.docs.map(doc => ({ uid: doc.id, ...doc.data() })));
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching employees:", error);
+            addToast('Permission denied or error loading employees', 'error');
+            setLoading(false);
+        });
+
+        return () => unsub();
     }, []);
 
     const handleDelete = async (uid) => {
         const confirmed = await showConfirm(
             'Delete Employee Account',
-            'Are you sure you want to permanently delete this employee? This action cannot be undone.',
+            'Are you sure you want to permanently delete this employee? (This only deletes the Firestore profile, not the Auth account)',
             'danger'
         );
         if (!confirmed) return;
 
         try {
-            const token = await auth.currentUser.getIdToken();
-            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/manager/employee/${uid}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (response.ok) {
-                addToast('Employee deleted successfully', 'success');
-                fetchEmployees();
-            } else {
-                const data = await response.json();
-                addToast(data.message || 'Error deleting employee', 'error');
-            }
+            await deleteDoc(doc(db, 'users', uid));
+            addToast('Employee profile deleted', 'success');
         } catch (error) {
+            console.error(error);
             addToast('Error deleting employee', 'error');
         }
     };
 
     const handleUpdate = () => {
         setEditingEmployee(null);
-        fetchEmployees();
     };
+
 
     if (loading) {
         return <div className="p-8 text-center text-slate-500">Loading employees...</div>;

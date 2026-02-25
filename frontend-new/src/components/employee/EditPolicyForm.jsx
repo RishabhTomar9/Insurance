@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '../../services/firebase';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../../services/firebase';
 import { X, FileText, Calendar, IndianRupee, Shield, Clock, Plus, Trash2, ChevronDown, ChevronUp, Briefcase, CreditCard, User, Landmark } from 'lucide-react';
 
 const EditPolicyForm = ({ policy, onUpdate, onCancel, cars = [], owners = [], employees = [], isManager = false }) => {
-    // Basic Details
+    // ... existing state initialization ...
     const [basicData, setBasicData] = useState({
         employeeId: '',
         date: new Date().toISOString().split('T')[0],
@@ -13,7 +14,6 @@ const EditPolicyForm = ({ policy, onUpdate, onCancel, cars = [], owners = [], em
         contactPerson: ''
     });
 
-    // Quotation Details
     const [quotationData, setQuotationData] = useState({
         isGiven: false,
         isSent: false,
@@ -27,7 +27,6 @@ const EditPolicyForm = ({ policy, onUpdate, onCancel, cars = [], owners = [], em
         toAccount: ''
     });
 
-    // Policy Issues & Payment Analysis
     const [policyData, setPolicyData] = useState({
         policyIssueDate: '',
         insuranceCompany: '',
@@ -42,30 +41,23 @@ const EditPolicyForm = ({ policy, onUpdate, onCancel, cars = [], owners = [], em
         policyPaymentMode: 'GI',
     });
 
-    // Entries (Payments DOING)
     const [paymentsOut, setPaymentsOut] = useState([]);
-
-    // Receipts (Payments RECEIVING)
     const [receiptsIn, setReceiptsIn] = useState([]);
-
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [showQuotation, setShowQuotation] = useState(true);
 
-    // Initialization Effect
     useEffect(() => {
         if (policy) {
-            // Basic
             setBasicData({
                 employeeId: policy.employeeId || '',
-                date: policy.createdAt ? new Date(policy.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                carId: policy.carId?._id || policy.carId || '',
-                ownerId: policy.ownerId?._id || policy.ownerId || '',
+                date: (policy.createdAt?.toDate ? policy.createdAt.toDate() : new Date()).toISOString().split('T')[0],
+                carId: policy.carId?.id || policy.carId?._id || policy.carId || '',
+                ownerId: policy.ownerId?.id || policy.ownerId?._id || policy.ownerId || '',
                 agentName: policy.agentName || '',
                 contactPerson: policy.contactPerson || ''
             });
 
-            // Quotation
             if (policy.quotation) {
                 setQuotationData({
                     isGiven: policy.quotation.isGiven || false,
@@ -81,13 +73,12 @@ const EditPolicyForm = ({ policy, onUpdate, onCancel, cars = [], owners = [], em
                 });
             }
 
-            // Policy
             setPolicyData({
-                policyIssueDate: policy.policyIssueDate ? new Date(policy.policyIssueDate).toISOString().split('T')[0] : '',
+                policyIssueDate: policy.policyIssueDate || '',
                 insuranceCompany: policy.insuranceCompany || '',
                 policyNumber: policy.policyNumber || '',
-                policyStartDate: policy.policyStartDate ? new Date(policy.policyStartDate).toISOString().split('T')[0] : '',
-                policyEndDate: policy.policyEndDate ? new Date(policy.policyEndDate).toISOString().split('T')[0] : '',
+                policyStartDate: policy.policyStartDate || '',
+                policyEndDate: policy.policyEndDate || '',
                 policyType: policy.policyType || 'Comprehensive',
                 finalInsuredAmount: policy.finalInsuredAmount || '',
                 finalThirdPartyPremium: policy.finalThirdPartyPremium || '',
@@ -96,33 +87,25 @@ const EditPolicyForm = ({ policy, onUpdate, onCancel, cars = [], owners = [], em
                 policyPaymentMode: policy.policyPaymentMode || 'GI'
             });
 
-            // Ledger
             if (policy.paymentsOut && policy.paymentsOut.length > 0) {
-                setPaymentsOut(policy.paymentsOut.map(p => ({
-                    ...p,
-                    date: p.date ? new Date(p.date).toISOString().split('T')[0] : ''
-                })));
+                setPaymentsOut(policy.paymentsOut);
             } else {
                 setPaymentsOut([{ category: 'Payment to Insurance Company', companyName: '', amount: '', date: new Date().toISOString().split('T')[0], paymentLinkType: 'GI', paymentMode: 'Bank', accountNumber: '' }]);
             }
 
             if (policy.receiptsIn && policy.receiptsIn.length > 0) {
-                setReceiptsIn(policy.receiptsIn.map(r => ({
-                    ...r,
-                    date: r.date ? new Date(r.date).toISOString().split('T')[0] : ''
-                })));
+                setReceiptsIn(policy.receiptsIn);
             } else {
                 setReceiptsIn([{ fromType: 'Owner', amount: '', date: new Date().toISOString().split('T')[0], paymentMode: 'Cash', bankAccountType: '', bankAccountNumber: '', creditDetails: 'Nil' }]);
             }
         }
     }, [policy]);
 
-    // Handlers
+    // ... handlers ...
     const handleBasicChange = (e) => setBasicData({ ...basicData, [e.target.name]: e.target.value });
     const handleQuotationChange = (e) => setQuotationData({ ...quotationData, [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
     const handlePolicyChange = (e) => setPolicyData({ ...policyData, [e.target.name]: e.target.value });
 
-    // Dynamic List Handlers
     const addPaymentOut = () => {
         setPaymentsOut([...paymentsOut, { category: 'Payment to Insurance Company', companyName: '', amount: '', date: new Date().toISOString().split('T')[0], paymentLinkType: 'GI', paymentMode: 'Bank', accountNumber: '' }]);
     };
@@ -159,56 +142,32 @@ const EditPolicyForm = ({ policy, onUpdate, onCancel, cars = [], owners = [], em
         setLoading(true);
 
         try {
-            const token = await auth.currentUser.getIdToken();
+            const user = auth.currentUser;
+            if (!user) throw new Error('Not authenticated');
 
             const payload = {
-                ...basicData, // carId, ownerId, etc.
-
-                // Quotation
+                ...basicData,
                 quotation: {
                     ...quotationData,
-                    insuredAmount: parseFloat(quotationData.insuredAmount),
-                    thirdPartyPremium: parseFloat(quotationData.thirdPartyPremium),
-                    odPremium: parseFloat(quotationData.odPremium),
-                    netPremium: parseFloat(quotationData.netPremium),
-                    actualPaymentAmount: parseFloat(quotationData.actualPaymentAmount)
+                    insuredAmount: parseFloat(quotationData.insuredAmount) || 0,
+                    thirdPartyPremium: parseFloat(quotationData.thirdPartyPremium) || 0,
+                    odPremium: parseFloat(quotationData.odPremium) || 0,
+                    netPremium: parseFloat(quotationData.netPremium) || 0,
+                    actualPaymentAmount: parseFloat(quotationData.actualPaymentAmount) || 0
                 },
-
-                // Policy
-                policyIssueDate: policyData.policyIssueDate,
-                insuranceCompany: policyData.insuranceCompany,
-                policyNumber: policyData.policyNumber,
-                policyStartDate: policyData.policyStartDate,
-                policyEndDate: policyData.policyEndDate,
-                policyType: policyData.policyType,
-                premiumAmount: parseFloat(policyData.finalPremium),
-                finalInsuredAmount: parseFloat(policyData.finalInsuredAmount),
-                finalThirdPartyPremium: parseFloat(policyData.finalThirdPartyPremium),
-                finalOdPremium: parseFloat(policyData.finalOdPremium),
-                finalPremium: parseFloat(policyData.finalPremium),
-
-                policyPaymentMode: policyData.policyPaymentMode,
-                paymentDifference: parseFloat(calculateDifference()),
-
-                // Lists
-                paymentsOut: paymentsOut.map(p => ({ ...p, amount: parseFloat(p.amount) })),
-                receiptsIn: receiptsIn.map(r => ({ ...r, amount: parseFloat(r.amount) }))
+                ...policyData,
+                premiumAmount: parseFloat(policyData.finalPremium) || 0,
+                finalInsuredAmount: parseFloat(policyData.finalInsuredAmount) || 0,
+                finalThirdPartyPremium: parseFloat(policyData.finalThirdPartyPremium) || 0,
+                finalOdPremium: parseFloat(policyData.finalOdPremium) || 0,
+                finalPremium: parseFloat(policyData.finalPremium) || 0,
+                paymentDifference: parseFloat(calculateDifference()) || 0,
+                paymentsOut: paymentsOut.map(p => ({ ...p, amount: parseFloat(p.amount) || 0 })),
+                receiptsIn: receiptsIn.map(r => ({ ...r, amount: parseFloat(r.amount) || 0 })),
+                updatedAt: serverTimestamp()
             };
 
-            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/policies/${policy._id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.message || 'Failed to update policy');
-            }
-
+            await updateDoc(doc(db, 'policies', policy.id || policy._id), payload);
             onUpdate();
         } catch (error) {
             console.error(error);
@@ -217,6 +176,7 @@ const EditPolicyForm = ({ policy, onUpdate, onCancel, cars = [], owners = [], em
             setLoading(false);
         }
     };
+
 
     return (
         <div className="bg-white w-full h-full min-h-screen overflow-y-auto">

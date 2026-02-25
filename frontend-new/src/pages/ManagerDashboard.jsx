@@ -1,45 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '../services/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 
 const ManagerDashboard = () => {
     const { currentUser } = useAuth();
     const [stats, setStats] = useState({ cars: 0, owners: 0, policies: 0, employees: 0 });
 
-    const fetchStats = async () => {
-        if (currentUser) {
-            try {
-                const token = await auth.currentUser.getIdToken();
-                const headers = { 'Authorization': `Bearer ${token}` };
-
-                // In a real app, these should be specialized count endpoints
-                const [carsRes, ownersRes, policiesRes, usersRes] = await Promise.all([
-                    fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/cars`, { headers }),
-                    fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/owners`, { headers }),
-                    fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/policies`, { headers }),
-                    fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/users`, { headers }),
-                ]);
-
-                const cars = await carsRes.json();
-                const owners = await ownersRes.json();
-                const policies = await policiesRes.json();
-                const users = await usersRes.json();
-
-                setStats({
-                    cars: cars.length || 0,
-                    owners: owners.length || 0,
-                    policies: policies.length || 0,
-                    employees: users.length || 0
-                });
-            } catch (error) {
-                console.error("Error fetching stats", error);
-            }
-        }
-    };
-
     useEffect(() => {
-        fetchStats();
+        if (!currentUser) return;
+
+        // Stats listeners
+        const unsubCars = onSnapshot(collection(db, 'cars'), (snap) => {
+            setStats(prev => ({ ...prev, cars: snap.size }));
+        });
+
+        const unsubOwners = onSnapshot(collection(db, 'owners'), (snap) => {
+            setStats(prev => ({ ...prev, owners: snap.size }));
+        });
+
+        const unsubPolicies = onSnapshot(collection(db, 'policies'), (snap) => {
+            setStats(prev => ({ ...prev, policies: snap.size }));
+        });
+
+        const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+            setStats(prev => ({ ...prev, employees: snap.size }));
+        });
+
+        return () => {
+            unsubCars();
+            unsubOwners();
+            unsubPolicies();
+            unsubUsers();
+        };
     }, [currentUser]);
+
 
     const StatCard = ({ title, value, color, icon }) => (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">

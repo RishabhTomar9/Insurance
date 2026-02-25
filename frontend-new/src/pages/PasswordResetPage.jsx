@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { updatePassword } from 'firebase/auth';
-import { auth } from '../services/firebase';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 
@@ -30,23 +31,27 @@ const PasswordResetPage = () => {
     }
 
     try {
-      await updatePassword(auth.currentUser, newPassword);
-      const token = await auth.currentUser.getIdToken();
+      const user = auth.currentUser;
+      if (!user) {
+        addToast('Session expired. Please login again.', 'error');
+        navigate('/login');
+        return;
+      }
 
-      // Update the user's status in MongoDB to indicate password has been changed
-      await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/users/${currentUser.uid}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ passwordChanged: true })
+      await updatePassword(user, newPassword);
+
+      // Update user status in Firestore
+      await updateDoc(doc(db, 'users', user.uid), {
+        passwordChanged: true,
+        updatedAt: serverTimestamp()
       });
 
-      await refreshUserData();
+      if (refreshUserData) await refreshUserData();
       addToast('Password changed successfully!', 'success');
       navigate('/employee');
     } catch (error) {
+
+
       console.error("Reset error:", error);
       if (error.code === 'auth/requires-recent-login') {
         addToast('Please login again to change your password', 'error');

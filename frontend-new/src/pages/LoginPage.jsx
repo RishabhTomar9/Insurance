@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../services/firebase';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff } from 'lucide-react';
 
@@ -25,25 +26,50 @@ const LoginPage = () => {
         try {
             const result = await signInWithPopup(auth, provider);
             const user = result.user;
-            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/auth/set-manager-claim`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ uid: user.uid })
-            });
 
-            if (response.ok) {
-                await user.getIdToken(true);
-                navigate('/manager');
+            // Check Firestore for existing user profile
+            const userDocRef = doc(db, 'users', user.uid);
+            let userDocSnap = await getDoc(userDocRef);
+
+            // Super-Admin & Authorization Check
+            const superAdminEmails = ['rishabhtomar9999@gmail.com'];
+
+            if (!userDocSnap.exists()) {
+                const authManagerRef = doc(db, 'authorized_managers', user.email);
+                const authSnap = await getDoc(authManagerRef);
+
+                if (authSnap.exists() || superAdminEmails.includes(user.email)) {
+
+                    await setDoc(userDocRef, {
+                        name: user.displayName || 'Manager',
+                        email: user.email,
+                        role: 'manager',
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
+                    });
+                    userDocSnap = await getDoc(userDocRef);
+                }
+            }
+
+            if (userDocSnap.exists()) {
+                const userData = userDocSnap.data();
+                if (userData.role === 'manager') {
+                    navigate('/manager');
+                } else {
+                    await auth.signOut();
+                    setError('You are not authorized as a manager.');
+                }
             } else {
                 await auth.signOut();
-                setError('You are not authorized to be a manager.');
+                setError('Manager access denied. Email not authorized.');
             }
         } catch (error) {
+            console.error("Manager Login Error:", error);
             setError(error.message);
         }
     };
+
+
 
     const handleEmployeeLogin = async (e) => {
         e.preventDefault();

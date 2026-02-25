@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { auth } from '../../services/firebase';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 import { X, User, Phone, MapPin, Mail, CreditCard, FileText } from 'lucide-react';
 
 const EditOwnerForm = ({ owner, onUpdate, onCancel, employees = [], isManager = false }) => {
@@ -28,28 +29,18 @@ const EditOwnerForm = ({ owner, onUpdate, onCancel, employees = [], isManager = 
         setLoading(true);
 
         try {
-            const token = await auth.currentUser.getIdToken();
-            const backendData = {
+            const payload = {
                 name: formData.ownerName,
                 phone: formData.mobileNo,
                 address: formData.address,
                 email: formData.email,
                 aadharCard: formData.aadharCard,
                 drivingLicense: formData.drivingLicense,
-                employeeId: formData.employeeId
+                employeeId: formData.employeeId,
+                updatedAt: serverTimestamp()
             };
 
-            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/owners/${owner._id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(backendData)
-            });
-
-            if (!response.ok) throw new Error('Failed to update owner');
-
+            await updateDoc(doc(db, 'owners', owner.id || owner._id), payload);
             onUpdate();
         } catch (error) {
             console.error(error);
@@ -58,6 +49,7 @@ const EditOwnerForm = ({ owner, onUpdate, onCancel, employees = [], isManager = 
             setLoading(false);
         }
     };
+
 
     return (
         <div className="bg-white w-full h-full min-h-screen">

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../services/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../services/firebase';
 
 const AuthContext = createContext();
 
@@ -14,24 +15,29 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUserData = async (user) => {
     if (user) {
-      const token = await user.getIdTokenResult();
       try {
-        // Force token refresh to get latest claims if needed, though mostly for backend data here
-        const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/users/${user.uid}`, {
-          headers: {
-            'Authorization': `Bearer ${token.token}`
-          }
-        });
-        if (response.ok) {
-          const userData = await response.json();
-          setCurrentUser({ ...user, ...userData, role: token.claims.role });
+        const token = await user.getIdTokenResult();
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          setCurrentUser({
+            ...user,
+            ...userData,
+            role: token.claims.role || userData.role,
+            employeeId: userData.employeeId
+          });
         } else {
-          console.error('Failed to fetch user data');
-          setCurrentUser({ ...user, role: token.claims.role });
+          console.warn('User document not found in Firestore');
+          setCurrentUser({
+            ...user,
+            role: token.claims.role
+          });
         }
       } catch (error) {
-        console.error('Error fetching user data from backend:', error);
-        setCurrentUser({ ...user, role: token.claims.role });
+        console.error('Error fetching user data from Firestore:', error);
+        setCurrentUser(user);
       }
     } else {
       setCurrentUser(null);
@@ -46,6 +52,7 @@ export const AuthProvider = ({ children }) => {
 
     return unsubscribe;
   }, []);
+
 
   const value = {
     currentUser,

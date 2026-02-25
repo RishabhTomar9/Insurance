@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirmed } from '../../contexts/DialogContext';
-import { auth } from '../../services/firebase';
 
 const ManagerBanks = () => {
     const { addToast } = useToast();
@@ -21,53 +22,41 @@ const ManagerBanks = () => {
     };
     const [formData, setFormData] = useState(initialFormState);
 
-    const fetchBanks = async () => {
-        try {
-            const token = await auth.currentUser.getIdToken();
-            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/banks`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await response.json();
-            setBanks(data);
-            setLoading(false);
-        } catch (error) {
-            console.error(error);
-            addToast('Failed to fetch banks', 'error');
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
-        fetchBanks();
+        const banksQuery = query(collection(db, 'banks'), orderBy('bankName', 'asc'));
+        const unsub = onSnapshot(banksQuery, (snap) => {
+            setBanks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setLoading(false);
+        }, (error) => {
+            console.error(error);
+            addToast('Permission denied or error loading banks', 'error');
+            setLoading(false);
+        });
+
+        return () => unsub();
     }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const token = await auth.currentUser.getIdToken();
-            const url = editId
-                ? `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/banks/${editId}`
-                : `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/banks`;
+            const payload = {
+                ...formData,
+                updatedAt: serverTimestamp()
+            };
 
-            const method = editId ? 'PUT' : 'POST';
-
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
-            });
-
-            if (response.ok) {
-                addToast(editId ? 'Bank updated successfully' : 'Bank added successfully', 'success');
-                fetchBanks();
-                handleCloseModal();
+            if (editId) {
+                await updateDoc(doc(db, 'banks', editId), payload);
+                addToast('Bank updated successfully', 'success');
             } else {
-                addToast('Failed to save bank', 'error');
+                await addDoc(collection(db, 'banks'), {
+                    ...payload,
+                    createdAt: serverTimestamp()
+                });
+                addToast('Bank added successfully', 'success');
             }
+            handleCloseModal();
         } catch (error) {
+            console.error(error);
             addToast('Error saving bank', 'error');
         }
     };
@@ -77,20 +66,16 @@ const ManagerBanks = () => {
         if (!confirmed) return;
 
         try {
-            const token = await auth.currentUser.getIdToken();
-            await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/banks/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            fetchBanks();
+            await deleteDoc(doc(db, 'banks', id));
             addToast('Bank deleted successfully', 'info');
         } catch (error) {
+            console.error(error);
             addToast('Failed to delete bank', 'error');
         }
     };
 
     const handleEdit = (bank) => {
-        setEditId(bank._id);
+        setEditId(bank.id);
         setFormData({
             bankName: bank.bankName,
             branch: bank.branch,
@@ -111,6 +96,7 @@ const ManagerBanks = () => {
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
+
 
     return (
         <div className="space-y-6">
@@ -138,7 +124,7 @@ const ManagerBanks = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-slate-200">
                         {banks.map(bank => (
-                            <tr key={bank._id} className="hover:bg-slate-50 transition-colors">
+                            <tr key={bank.id} className="hover:bg-slate-50 transition-colors">
                                 <td className="px-6 py-4">
                                     <div className="text-sm font-bold text-slate-900">{bank.bankName}</div>
                                     <div className="text-xs text-slate-500">{bank.branch}</div>
@@ -158,11 +144,12 @@ const ManagerBanks = () => {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                     <div className="flex space-x-3">
                                         <button onClick={() => handleEdit(bank)} className="text-indigo-600 hover:text-indigo-900 font-semibold transition-colors">Edit</button>
-                                        <button onClick={() => handleDelete(bank._id)} className="text-red-500 hover:text-red-700">Delete</button>
+                                        <button onClick={() => handleDelete(bank.id)} className="text-red-500 hover:text-red-700">Delete</button>
                                     </div>
                                 </td>
                             </tr>
                         ))}
+
                         {banks.length === 0 && !loading && (
                             <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-500">No bank accounts found.</td></tr>
                         )}

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { auth } from '../../services/firebase';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 import { useToast } from '../../contexts/ToastContext';
 
 const EditEmployeeForm = ({ employee, onUpdate, onCancel, onDelete }) => {
     const [name, setName] = useState(employee.name);
     const [email, setEmail] = useState(employee.email);
+    const [role, setRole] = useState(employee.role || 'employee');
     const [loading, setLoading] = useState(false);
     const { addToast } = useToast();
 
@@ -13,24 +15,16 @@ const EditEmployeeForm = ({ employee, onUpdate, onCancel, onDelete }) => {
         setLoading(true);
 
         try {
-            const token = await auth.currentUser.getIdToken();
-            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/manager/employee/update`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ uid: employee.uid, name, email })
+            await updateDoc(doc(db, 'users', employee.uid), {
+                name,
+                email,
+                role,
+                updatedAt: serverTimestamp()
             });
-
-            if (response.ok) {
-                addToast('Employee updated successfully', 'success');
-                onUpdate();
-            } else {
-                const data = await response.json();
-                addToast(data.message || 'Error updating employee', 'error');
-            }
+            addToast('Employee updated successfully', 'success');
+            onUpdate();
         } catch (error) {
+            console.error(error);
             addToast('Error updating employee', 'error');
         } finally {
             setLoading(false);
@@ -45,8 +39,8 @@ const EditEmployeeForm = ({ employee, onUpdate, onCancel, onDelete }) => {
                         <div className="inline-flex items-center justify-center w-12 h-12 rounded-full mb-3 bg-indigo-100 text-indigo-600">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                         </div>
-                        <h2 className="text-2xl font-bold text-slate-800">Edit Employee</h2>
-                        <p className="text-slate-500 text-sm">Update account details for this user</p>
+                        <h2 className="text-2xl font-bold text-slate-800">Edit User Account</h2>
+                        <p className="text-slate-500 text-sm">Update profile and role for this user</p>
                     </div>
 
                     <form onSubmit={handleUpdate} className="space-y-4">
@@ -71,6 +65,17 @@ const EditEmployeeForm = ({ employee, onUpdate, onCancel, onDelete }) => {
                                 placeholder="email@company.com"
                                 required
                             />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">User Role</label>
+                            <select
+                                value={role}
+                                onChange={(e) => setRole(e.target.value)}
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                            >
+                                <option value="employee">Employee</option>
+                                <option value="manager">Manager</option>
+                            </select>
                         </div>
 
                         <div className="flex items-center justify-between pt-4 border-t border-slate-100">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '../services/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 // Reusing our standardized components for consistent UI since functionality is identical
 import ManagerCars from './manager/ManagerCars';
@@ -11,32 +12,34 @@ const EmployeeDashboard = () => {
     const [stats, setStats] = useState({ cars: 0, owners: 0, policies: 0 });
 
     useEffect(() => {
-        const fetchStats = async () => {
-            if (currentUser) {
-                try {
-                    const token = await auth.currentUser.getIdToken();
-                    const headers = { 'Authorization': `Bearer ${token}` };
+        if (!currentUser) return;
 
-                    const [carsRes, ownersRes, policiesRes] = await Promise.all([
-                        fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/cars`, { headers }),
-                        fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/owners`, { headers }),
-                        fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/policies`, { headers })
-                    ]);
+        const employeeId = currentUser.uid;
 
-                    const cars = await carsRes.json();
-                    const owners = await ownersRes.json();
-                    const policies = await policiesRes.json();
+        // Stats listeners
+        const carsQuery = query(collection(db, 'cars'), where('employeeId', '==', employeeId));
+        const ownersQuery = query(collection(db, 'owners'), where('employeeId', '==', employeeId));
+        const policiesQuery = query(collection(db, 'policies'), where('employeeId', '==', employeeId));
 
-                    setStats({
-                        cars: cars.length || 0,
-                        owners: owners.length || 0,
-                        policies: policies.length || 0
-                    });
-                } catch (e) { console.error(e); }
-            }
+        const unsubCars = onSnapshot(carsQuery, (snap) => {
+            setStats(prev => ({ ...prev, cars: snap.size }));
+        });
+
+        const unsubOwners = onSnapshot(ownersQuery, (snap) => {
+            setStats(prev => ({ ...prev, owners: snap.size }));
+        });
+
+        const unsubPolicies = onSnapshot(policiesQuery, (snap) => {
+            setStats(prev => ({ ...prev, policies: snap.size }));
+        });
+
+        return () => {
+            unsubCars();
+            unsubOwners();
+            unsubPolicies();
         };
-        fetchStats();
     }, [currentUser]);
+
 
     const StatCard = ({ title, value, color, icon }) => (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">

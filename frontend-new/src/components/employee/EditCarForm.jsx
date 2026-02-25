@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { auth } from '../../services/firebase';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 import { X } from 'lucide-react';
 
 const EditCarForm = ({ car, onUpdate, onCancel, employees = [], isManager = false }) => {
@@ -30,7 +31,6 @@ const EditCarForm = ({ car, onUpdate, onCancel, employees = [], isManager = fals
         setLoading(true);
 
         try {
-            const token = await auth.currentUser.getIdToken();
             const payload = {
                 vehicleNumber: formData.vehicleNumber,
                 chassisNumber: formData.chassisNumber,
@@ -42,24 +42,20 @@ const EditCarForm = ({ car, onUpdate, onCancel, employees = [], isManager = fals
                     name: formData.agentName,
                     mobile: formData.agentMobile,
                     email: formData.agentEmail
-                }
+                },
+                updatedAt: serverTimestamp()
             };
 
-            await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/cars/${car._id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(payload)
-            });
+            await updateDoc(doc(db, 'cars', car.id || car._id), payload);
             onUpdate();
         } catch (error) {
+            console.error(error);
             setError('Error updating vehicle');
         } finally {
             setLoading(false);
         }
     };
+
 
     return (
         <div className="bg-white w-full h-full min-h-screen">

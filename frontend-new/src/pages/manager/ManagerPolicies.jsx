@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '../../services/firebase';
+import { collection, query, where, onSnapshot, doc, deleteDoc, orderBy } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirmed } from '../../contexts/DialogContext';
@@ -16,55 +17,59 @@ const ManagerPolicies = () => {
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    // Maps for fast lookup (population)
+    const carsMap = React.useMemo(() => new Map(cars.map(c => [c.id, c])), [cars]);
+    const ownersMap = React.useMemo(() => new Map(owners.map(o => [o.id, o])), [owners]);
+
     // UI State
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingPolicy, setEditingPolicy] = useState(null);
 
-    const fetchData = async () => {
-        try {
-            const token = await auth.currentUser.getIdToken();
-            const headers = { 'Authorization': `Bearer ${token}` };
-
-            const [policiesRes, carsRes, ownersRes] = await Promise.all([
-                fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/policies`, { headers }),
-                fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/cars`, { headers }),
-                fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/owners`, { headers })
-            ]);
-
-            setPolicies(await policiesRes.json());
-            setCars(await carsRes.json());
-            setOwners(await ownersRes.json());
-            setLoading(false);
-        } catch (error) {
-            console.error("Error fetching data", error);
-            addToast('Failed to load system data', 'error');
-            setLoading(false);
-        }
-    };
-
-    const fetchEmployees = async () => {
-        if (currentUser?.role === 'manager') {
-            try {
-                const token = await auth.currentUser.getIdToken();
-                const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/users`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await response.json();
-                setEmployees(data);
-            } catch (error) {
-                console.error('Error fetching employees');
-            }
-        }
-    };
-
     useEffect(() => {
-        fetchData();
-        fetchEmployees();
+        if (!currentUser) return;
+
+        const isManager = currentUser.role === 'manager';
+
+        // Policies Listener
+        const policiesQuery = isManager
+            ? query(collection(db, 'policies'), orderBy('createdAt', 'desc'))
+            : query(collection(db, 'policies'), where('employeeId', '==', currentUser.uid), orderBy('createdAt', 'desc'));
+
+        const unsubPolicies = onSnapshot(policiesQuery, (snap) => {
+            const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setPolicies(data);
+            setLoading(false);
+        });
+
+        // Cars Listener
+        const unsubCars = onSnapshot(collection(db, 'cars'), (snap) => {
+            setCars(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+
+        // Owners Listener
+        const unsubOwners = onSnapshot(collection(db, 'owners'), (snap) => {
+            setOwners(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+
+        // Employees (Users) Listener - only for managers
+        let unsubEmployees = () => { };
+        if (isManager) {
+            unsubEmployees = onSnapshot(collection(db, 'users'), (snap) => {
+                setEmployees(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+        }
+
+        return () => {
+            unsubPolicies();
+            unsubCars();
+            unsubOwners();
+            unsubEmployees();
+        };
     }, [currentUser]);
 
     const handleEdit = (policy) => {
         setEditingPolicy(policy);
-        setIsAddModalOpen(false); // Ensure Only one is open if overlapping logic exist
+        setIsAddModalOpen(false);
     };
 
     const handleDelete = async (id) => {
@@ -76,12 +81,7 @@ const ManagerPolicies = () => {
         if (!confirmed) return;
 
         try {
-            const token = await auth.currentUser.getIdToken();
-            await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/policies/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            fetchData();
+            await deleteDoc(doc(db, 'policies', id));
             addToast('Policy voided successfully', 'info');
         } catch (error) {
             console.error(error);
@@ -89,7 +89,8 @@ const ManagerPolicies = () => {
         }
     };
 
-    if (loading) return <div className="p-8 text-center text-slate-500">Loading system data...</div>;
+    if (loading) return <div className="p-8 text-center text-slate-500 font-medium">Connecting to real-time sync...</div>;
+
 
     return (
         <div className="space-y-6">
@@ -121,22 +122,28 @@ const ManagerPolicies = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-slate-200">
                         {policies.map(policy => (
-                            <tr key={policy._id} className="hover:bg-slate-50 transition-colors">
+                            <tr key={policy.id} className="hover:bg-slate-50 transition-colors">
                                 <td className="px-6 py-4">
                                     <div className="text-sm font-bold text-indigo-900">{policy.policyNumber || 'Running Quotation'}</div>
                                     <div className="text-xs font-medium text-slate-600">{policy.policyType}</div>
                                     <div className="text-[10px] text-slate-400 mt-0.5">{policy.policyDuration} starting {new Date(policy.startDate || policy.policyStartDate || Date.now()).toLocaleDateString()}</div>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{policy.ownerId?.name || 'Unknown'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className="px-2 py-1 text-xs font-semibold bg-slate-100 text-slate-700 rounded">{policy.carId?.vehicleNumber || 'Unknown'}</span>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
+                                    {ownersMap.get(policy.ownerId)?.name || 'Unknown Client'}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 max-w-xs truncate">{policy.insuranceCompany || 'Pending Issue'} - {policy.finalInsuredAmount ? `IDV: ₹${policy.finalInsuredAmount}` : 'No IDV'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <span className="px-2 py-1 text-xs font-semibold bg-slate-100 text-slate-700 rounded">
+                                        {carsMap.get(policy.carId)?.vehicleNumber || 'Unknown Vehicle'}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 max-w-xs truncate">
+                                    {policy.insuranceCompany || 'Pending Issue'} - {policy.finalInsuredAmount ? `IDV: ₹${policy.finalInsuredAmount}` : 'No IDV'}
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-600">₹{policy.finalPremium || policy.premiumAmount || 0}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                     <div className="flex space-x-3">
                                         <button onClick={() => handleEdit(policy)} className="text-indigo-600 hover:text-indigo-900 font-semibold transition-colors">Edit</button>
-                                        <button onClick={() => handleDelete(policy._id)} className="text-red-500 hover:text-red-700">Void</button>
+                                        <button onClick={() => handleDelete(policy.id)} className="text-red-500 hover:text-red-700">Void</button>
                                     </div>
                                 </td>
                             </tr>
@@ -155,7 +162,7 @@ const ManagerPolicies = () => {
                             employees={employees}
                             isManager={true}
                             onAdd={() => {
-                                fetchData();
+                                setIsAddModalOpen(false);
                                 addToast('Policy successfully created', 'success');
                             }}
                             onClose={() => setIsAddModalOpen(false)}
@@ -174,7 +181,6 @@ const ManagerPolicies = () => {
                             employees={employees}
                             isManager={true}
                             onUpdate={() => {
-                                fetchData();
                                 setEditingPolicy(null);
                                 addToast('Policy successfully updated', 'success');
                             }}
@@ -183,6 +189,7 @@ const ManagerPolicies = () => {
                     </div>
                 </div>
             )}
+
         </div>
     );
 };

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { auth } from '../../services/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../../services/firebase';
 import { X, Car, User, FileText, ChevronDown, ChevronUp, CheckCircle, AlertCircle } from 'lucide-react';
 
 const AddCarForm = ({ onAdd, onClose, employees = [], isManager = false }) => {
-    // Stage 1: Vehicle Data
+    // ... state init remains same
     const [vehicleData, setVehicleData] = useState({
         vehicleNumber: '',
         chassisNumber: '',
@@ -21,7 +22,6 @@ const AddCarForm = ({ onAdd, onClose, employees = [], isManager = false }) => {
         employeeId: ''
     });
 
-    // Stage 2: Owner Data (Optional)
     const [addOwner, setAddOwner] = useState(false);
     const [ownerData, setOwnerData] = useState({
         name: '',
@@ -32,7 +32,6 @@ const AddCarForm = ({ onAdd, onClose, employees = [], isManager = false }) => {
         drivingLicense: ''
     });
 
-    // Stage 3: Policy Data (Optional)
     const [addPolicy, setAddPolicy] = useState(false);
     const [policyData, setPolicyData] = useState({
         policyType: 'Comprehensive',
@@ -56,36 +55,30 @@ const AddCarForm = ({ onAdd, onClose, employees = [], isManager = false }) => {
         setLoading(true);
 
         try {
-            const token = await auth.currentUser.getIdToken();
-            const headers = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            };
-            const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+            const user = auth.currentUser;
+            if (!user) throw new Error('Not authenticated');
+
+            const currentEmployeeId = vehicleData.employeeId || user.uid;
 
             // 1. Create Car
             const carPayload = {
                 ...vehicleData,
+                employeeId: currentEmployeeId,
                 agentDetails: {
                     name: vehicleData.agentName,
                     mobile: vehicleData.agentMobile,
                     email: vehicleData.agentEmail
-                }
+                },
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
             };
-            // Clean up flat agent fields from payload if backend doesn't want them (schema uses agentDetails)
+
             delete carPayload.agentName;
             delete carPayload.agentMobile;
             delete carPayload.agentEmail;
 
-            const carRes = await fetch(`${baseUrl}/api/cars`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(carPayload)
-            });
-
-            if (!carRes.ok) throw new Error('Failed to create vehicle record');
-            const carResult = await carRes.json();
-            const newCarId = carResult._id || carResult.id; // Adjust based on backend response
+            const carDocRef = await addDoc(collection(db, 'cars'), carPayload);
+            const newCarId = carDocRef.id;
 
             let newOwnerId = null;
 
@@ -93,19 +86,14 @@ const AddCarForm = ({ onAdd, onClose, employees = [], isManager = false }) => {
             if (addOwner) {
                 const ownerPayload = {
                     ...ownerData,
-                    phone: ownerData.mobile, // Map mobile to phone
-                    employeeId: vehicleData.employeeId || (auth.currentUser ? auth.currentUser.uid : '')
+                    phone: ownerData.mobile,
+                    employeeId: currentEmployeeId,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
                 };
 
-                const ownerRes = await fetch(`${baseUrl}/api/owners`, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(ownerPayload)
-                });
-
-                if (!ownerRes.ok) throw new Error('Vehicle created, but failed to create Owner record');
-                const ownerResult = await ownerRes.json();
-                newOwnerId = ownerResult._id || ownerResult.id;
+                const ownerDocRef = await addDoc(collection(db, 'owners'), ownerPayload);
+                newOwnerId = ownerDocRef.id;
             }
 
             // 3. Create Policy (if requested)
@@ -116,16 +104,14 @@ const AddCarForm = ({ onAdd, onClose, employees = [], isManager = false }) => {
                     ...policyData,
                     carId: newCarId,
                     ownerId: newOwnerId,
-                    employeeId: vehicleData.employeeId || (auth.currentUser ? auth.currentUser.uid : '')
+                    employeeId: currentEmployeeId,
+                    premiumAmount: parseFloat(policyData.premiumAmount) || 0,
+                    finalPremium: parseFloat(policyData.premiumAmount) || 0,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
                 };
 
-                const policyRes = await fetch(`${baseUrl}/api/policies`, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(policyPayload)
-                });
-
-                if (!policyRes.ok) throw new Error('Vehicle & Owner created, but failed to create Policy');
+                await addDoc(collection(db, 'policies'), policyPayload);
             }
 
             setStatus({ type: 'success', message: 'All records created successfully!' });
@@ -143,6 +129,7 @@ const AddCarForm = ({ onAdd, onClose, employees = [], isManager = false }) => {
             setLoading(false);
         }
     };
+
 
     return (
         <div className="bg-white w-full h-full min-h-screen">

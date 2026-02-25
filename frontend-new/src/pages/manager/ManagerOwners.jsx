@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '../../services/firebase';
+import { collection, query, where, onSnapshot, doc, deleteDoc, orderBy } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirmed } from '../../contexts/DialogContext';
@@ -18,39 +19,33 @@ const OwnerList = () => {
     const [editingOwner, setEditingOwner] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const fetchOwners = async () => {
-        try {
-            const token = await auth.currentUser.getIdToken();
-            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/owners`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await response.json();
-            setOwners(data);
-        } catch (error) {
-            console.error('Error fetching owners:', error);
-            addToast('Failed to load owners', 'error');
-        }
-        setLoading(false);
-    };
-
-    const fetchEmployees = async () => {
-        if (currentUser?.role === 'manager') {
-            try {
-                const token = await auth.currentUser.getIdToken();
-                const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/users`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await response.json();
-                setEmployees(data);
-            } catch (error) {
-                console.error('Error fetching employees');
-            }
-        }
-    };
-
     useEffect(() => {
-        fetchOwners();
-        fetchEmployees();
+        if (!currentUser) return;
+
+        const isManager = currentUser.role === 'manager';
+
+        // Owners Listener
+        const ownersQuery = isManager
+            ? query(collection(db, 'owners'), orderBy('createdAt', 'desc'))
+            : query(collection(db, 'owners'), where('employeeId', '==', currentUser.uid), orderBy('createdAt', 'desc'));
+
+        const unsubOwners = onSnapshot(ownersQuery, (snap) => {
+            setOwners(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setLoading(false);
+        });
+
+        // Employees Listener - only for managers
+        let unsubEmployees = () => { };
+        if (isManager) {
+            unsubEmployees = onSnapshot(collection(db, 'users'), (snap) => {
+                setEmployees(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+        }
+
+        return () => {
+            unsubOwners();
+            unsubEmployees();
+        };
     }, [currentUser]);
 
     const handleEdit = (owner) => {
@@ -66,12 +61,7 @@ const OwnerList = () => {
         if (!confirmed) return;
 
         try {
-            const token = await auth.currentUser.getIdToken();
-            await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/owners/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            fetchOwners();
+            await deleteDoc(doc(db, 'owners', id));
             addToast('Owner record deleted', 'info');
         } catch (error) {
             console.error(error);
@@ -86,9 +76,9 @@ const OwnerList = () => {
     );
 
     if (loading) return (
-        <div className="flex items-center justify-center h-64 text-slate-500 animate-pulse">
+        <div className="flex items-center justify-center min-h-[400px] text-slate-500 animate-pulse">
             <Users size={32} className="mr-3" />
-            <span className="text-lg font-medium">Loading client database...</span>
+            <span className="text-lg font-medium">Syncing client database...</span>
         </div>
     );
 
@@ -131,7 +121,7 @@ const OwnerList = () => {
                     {/* Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredOwners.map(owner => (
-                            <div key={owner._id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-indigo-300 transition-all duration-300 group relative overflow-hidden flex flex-col">
+                            <div key={owner.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-indigo-300 transition-all duration-300 group relative overflow-hidden flex flex-col">
                                 <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-10 transition-opacity">
                                     <Users size={100} className="text-indigo-900 transform rotate-12 translate-x-4 -translate-y-4" />
                                 </div>
@@ -150,7 +140,7 @@ const OwnerList = () => {
                                                 <Edit2 size={18} />
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(owner._id)}
+                                                onClick={() => handleDelete(owner.id)}
                                                 className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                                 title="Delete Record"
                                             >
@@ -158,7 +148,6 @@ const OwnerList = () => {
                                             </button>
                                         </div>
                                     </div>
-
                                     <h3 className="text-xl font-bold text-slate-800 mb-1 truncate">{owner.name}</h3>
 
                                     <div className="space-y-3 pt-4 border-t border-slate-100 text-sm">
@@ -202,7 +191,6 @@ const OwnerList = () => {
                         <AddOwnerForm
                             onAdd={() => {
                                 setIsAddModalOpen(false);
-                                fetchOwners();
                             }}
                             onCancel={() => setIsAddModalOpen(false)}
                             employees={employees}
@@ -215,7 +203,6 @@ const OwnerList = () => {
                             owner={editingOwner}
                             onUpdate={() => {
                                 setEditingOwner(null);
-                                fetchOwners();
                             }}
                             onCancel={() => setEditingOwner(null)}
                             employees={employees}
@@ -229,3 +216,4 @@ const OwnerList = () => {
 };
 
 export default OwnerList;
+

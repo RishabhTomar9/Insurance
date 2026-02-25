@@ -33,36 +33,33 @@ const LoginPage = () => {
 
             // Super-Admin & Authorization Check
             const superAdminEmails = ['rishabhtomar9999@gmail.com'];
+            const userEmailLower = user.email.toLowerCase();
+            const isAuthorizedEmail = superAdminEmails.includes(userEmailLower) ||
+                (await getDoc(doc(db, 'authorized_managers', userEmailLower))).exists();
 
-            if (!userDocSnap.exists()) {
-                const authManagerRef = doc(db, 'authorized_managers', user.email);
-                const authSnap = await getDoc(authManagerRef);
-
-                if (authSnap.exists() || superAdminEmails.includes(user.email)) {
-
+            if (isAuthorizedEmail) {
+                // If not in Firestore or role is not manager, create/update
+                if (!userDocSnap.exists() || userDocSnap.data().role !== 'manager') {
                     await setDoc(userDocRef, {
                         name: user.displayName || 'Manager',
                         email: user.email,
                         role: 'manager',
-                        createdAt: serverTimestamp(),
-                        updatedAt: serverTimestamp()
-                    });
+                        updatedAt: serverTimestamp(),
+                        ...(userDocSnap.exists() ? {} : { createdAt: serverTimestamp() })
+                    }, { merge: true });
+
+                    // Refresh snapshot
                     userDocSnap = await getDoc(userDocRef);
                 }
             }
 
-            if (userDocSnap.exists()) {
-                const userData = userDocSnap.data();
-                if (userData.role === 'manager') {
-                    navigate('/manager');
-                } else {
-                    await auth.signOut();
-                    setError('You are not authorized as a manager.');
-                }
+            if (userDocSnap.exists() && userDocSnap.data().role === 'manager') {
+                navigate('/manager');
             } else {
                 await auth.signOut();
-                setError('Manager access denied. Email not authorized.');
+                setError('Manager access denied. This email is not authorized for manager access.');
             }
+
         } catch (error) {
             console.error("Manager Login Error:", error);
             setError(error.message);

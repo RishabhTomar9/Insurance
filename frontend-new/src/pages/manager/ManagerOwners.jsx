@@ -22,22 +22,30 @@ const OwnerList = () => {
     useEffect(() => {
         if (!currentUser) return;
 
-        const isManager = currentUser.role === 'manager';
+        const isManager = currentUser.role === 'manager' || currentUser.role === 'super-admin';
+        const companyId = currentUser.companyId;
+
+        if (!companyId) return;
 
         // Owners Listener
         const ownersQuery = isManager
-            ? query(collection(db, 'owners'), orderBy('createdAt', 'desc'))
-            : query(collection(db, 'owners'), where('employeeId', '==', currentUser.uid), orderBy('createdAt', 'desc'));
+            ? query(collection(db, 'owners'), where('companyId', '==', companyId), orderBy('createdAt', 'desc'))
+            : query(collection(db, 'owners'), where('companyId', '==', companyId), where('employeeId', '==', currentUser.uid), orderBy('createdAt', 'desc'));
 
         const unsubOwners = onSnapshot(ownersQuery, (snap) => {
             setOwners(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             setLoading(false);
+        }, (error) => {
+            console.error(error);
+            addToast('Permission denied or error loading owners', 'error');
+            setLoading(false);
         });
 
-        // Employees Listener - only for managers
+        // Employees Listener - only for managers/admins
         let unsubEmployees = () => { };
         if (isManager) {
-            unsubEmployees = onSnapshot(collection(db, 'users'), (snap) => {
+            const employeesQuery = query(collection(db, 'users'), where('companyId', '==', companyId));
+            unsubEmployees = onSnapshot(employeesQuery, (snap) => {
                 setEmployees(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             });
         }

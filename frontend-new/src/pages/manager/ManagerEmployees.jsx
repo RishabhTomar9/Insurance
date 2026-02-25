@@ -5,10 +5,12 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, firebaseConfig } from '../../services/firebase';
 
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext'; // Added useAuth import
 import EmployeeList from '../../components/manager/EmployeeList';
 
 const ManagerEmployees = () => {
-    const isSuperAdmin = auth.currentUser?.email === 'rishabhtomar9999@gmail.com';
+    const { currentUser } = useAuth(); // Moved useAuth call to component level
+    const isSuperAdmin = currentUser?.role === 'super-admin' || currentUser?.email === 'rishabhtomar9999@gmail.com'; // Updated isSuperAdmin definition
     const [showInstructions, setShowInstructions] = useState(false);
     const [authEmail, setAuthEmail] = useState('');
     const [empName, setEmpName] = useState('');
@@ -48,6 +50,12 @@ const ManagerEmployees = () => {
         if (!empName || !empEmail) return;
         setCreating(true);
 
+        if (!currentUser?.companyId) { // Added check for companyId
+            addToast("Manager's company information missing.", 'error');
+            setCreating(false);
+            return;
+        }
+
         // Auto-generate stable temporary password
         const tempPassword = `Griva@${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -63,11 +71,13 @@ const ManagerEmployees = () => {
 
             // 2. Create Firestore Profile
             await setDoc(doc(db, 'users', newUser.uid), {
+                uid: newUser.uid,
                 name: empName,
                 email: empEmail,
                 role: 'employee',
+                companyId: currentUser.companyId,
                 employeeId: `EMP${Math.floor(1000 + Math.random() * 9000)}`,
-                tempPassword: tempPassword, // Saved for visibility in employee list
+                tempPassword: tempPassword,
                 passwordChanged: false,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()

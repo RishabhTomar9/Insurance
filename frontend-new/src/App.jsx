@@ -6,15 +6,21 @@ import Loader from './components/common/Loader';
 // Lazy Load Pages
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const PasswordResetPage = lazy(() => import('./pages/PasswordResetPage'));
+const CompanyRegistrationPage = lazy(() => import('./pages/CompanyRegistrationPage'));
+const SuperAdminInitPage = lazy(() => import('./pages/SuperAdminInitPage'));
 const DashboardLayout = lazy(() => import('./components/layout/DashboardLayout'));
+
+// Super Admin Pages
+const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
+const ManagerEmployees = lazy(() => import('./pages/manager/ManagerEmployees'));
 
 // Manager Pages
 const ManagerDashboard = lazy(() => import('./pages/ManagerDashboard'));
-const ManagerEmployees = lazy(() => import('./pages/manager/ManagerEmployees'));
 const ManagerOwners = lazy(() => import('./pages/manager/ManagerOwners'));
 const ManagerCars = lazy(() => import('./pages/manager/ManagerCars'));
 const ManagerPolicies = lazy(() => import('./pages/manager/ManagerPolicies'));
 const ManagerBanks = lazy(() => import('./pages/manager/ManagerBanks'));
+const ManagerAgents = lazy(() => import('./pages/manager/ManagerAgents'));
 
 // Employee Pages
 const EmployeeDashboard = lazy(() => import('./pages/EmployeeDashboard'));
@@ -29,7 +35,9 @@ const App = () => {
         <Suspense fallback={<Loader />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register-company" element={<CompanyRegistrationPage />} />
             <Route path="/reset-password" element={<PasswordResetPage />} />
+            <Route path="/superadmin-init" element={<SuperAdminInitPage />} />
 
             <Route element={<ProtectedRoute role="manager" />}>
               <Route path="/manager" element={<DashboardLayout />}>
@@ -39,6 +47,18 @@ const App = () => {
                 <Route path="owners" element={<ManagerOwners />} />
                 <Route path="policies" element={<ManagerPolicies />} />
                 <Route path="banks" element={<ManagerBanks />} />
+                <Route path="agents" element={<ManagerAgents />} />
+              </Route>
+            </Route>
+
+            <Route element={<ProtectedRoute role="super-admin" />}>
+              <Route path="/super-admin" element={<DashboardLayout />}>
+                <Route index element={<SuperAdminDashboard />} />
+                <Route path="managers" element={<ManagerEmployees />} />
+                <Route path="cars" element={<ManagerCars />} />
+                <Route path="owners" element={<ManagerOwners />} />
+                <Route path="policies" element={<ManagerPolicies />} />
+                <Route path="agents" element={<ManagerAgents />} />
               </Route>
             </Route>
 
@@ -66,11 +86,12 @@ const ProtectedRoute = ({ role }) => {
     return <Navigate to="/login" />;
   }
 
-  if (currentUser.role !== role) {
+  const allowedRoles = Array.isArray(role) ? role : [role];
+  if (!allowedRoles.includes(currentUser.role)) {
     return <Navigate to="/login" />;
   }
 
-  if (role === 'employee' && !currentUser.passwordChanged) {
+  if (currentUser.role === 'employee' && !currentUser.passwordChanged) {
     return <Navigate to="/reset-password" />;
   }
 

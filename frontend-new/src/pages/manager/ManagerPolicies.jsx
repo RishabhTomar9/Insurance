@@ -28,33 +28,40 @@ const ManagerPolicies = () => {
     useEffect(() => {
         if (!currentUser) return;
 
-        const isManager = currentUser.role === 'manager';
+        const isManager = currentUser.role === 'manager' || currentUser.role === 'super-admin';
+        const companyId = currentUser.companyId;
+
+        if (!companyId) return;
 
         // Policies Listener
         const policiesQuery = isManager
-            ? query(collection(db, 'policies'), orderBy('createdAt', 'desc'))
-            : query(collection(db, 'policies'), where('employeeId', '==', currentUser.uid), orderBy('createdAt', 'desc'));
+            ? query(collection(db, 'policies'), where('companyId', '==', companyId), orderBy('createdAt', 'desc'))
+            : query(collection(db, 'policies'), where('companyId', '==', companyId), where('employeeId', '==', currentUser.uid), orderBy('createdAt', 'desc'));
 
         const unsubPolicies = onSnapshot(policiesQuery, (snap) => {
             const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setPolicies(data);
             setLoading(false);
+        }, (error) => {
+            console.error(error);
+            addToast('Error loading policies', 'error');
+            setLoading(false);
         });
 
         // Cars Listener
-        const unsubCars = onSnapshot(collection(db, 'cars'), (snap) => {
+        const unsubCars = onSnapshot(query(collection(db, 'cars'), where('companyId', '==', companyId)), (snap) => {
             setCars(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         });
 
         // Owners Listener
-        const unsubOwners = onSnapshot(collection(db, 'owners'), (snap) => {
+        const unsubOwners = onSnapshot(query(collection(db, 'owners'), where('companyId', '==', companyId)), (snap) => {
             setOwners(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         });
 
-        // Employees (Users) Listener - only for managers
+        // Employees (Users) Listener - only for managers/admins
         let unsubEmployees = () => { };
         if (isManager) {
-            unsubEmployees = onSnapshot(collection(db, 'users'), (snap) => {
+            unsubEmployees = onSnapshot(query(collection(db, 'users'), where('companyId', '==', companyId)), (snap) => {
                 setEmployees(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             });
         }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useToast } from '../../contexts/ToastContext';
+import { X, User, Mail, Shield, Trash2, Check, Loader2 } from 'lucide-react';
 
 const EditEmployeeForm = ({ employee, onUpdate, onCancel, onDelete }) => {
     const [name, setName] = useState(employee.name);
@@ -32,76 +33,118 @@ const EditEmployeeForm = ({ employee, onUpdate, onCancel, onDelete }) => {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100 animate-scale-in">
-                <div className="p-6">
-                    <div className="text-center mb-6">
-                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full mb-3 bg-indigo-100 text-indigo-600">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fadeIn">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all animate-scaleUp">
+                <div className="relative p-8">
+                    {/* Close Button */}
+                    <button
+                        onClick={onCancel}
+                        className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
+                    >
+                        <X size={20} />
+                    </button>
+
+                    <div className="mb-8">
+                        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4 bg-indigo-50 text-indigo-600 shadow-sm border border-indigo-100">
+                            <User size={28} />
                         </div>
-                        <h2 className="text-2xl font-bold text-slate-800">Edit User Account</h2>
-                        <p className="text-slate-500 text-sm">Update profile and role for this user</p>
+                        <h2 className="text-2xl font-bold text-slate-900">Edit User Account</h2>
+                        <p className="text-slate-500 mt-1">Update profile details and administrative roles.</p>
                     </div>
 
-                    <form onSubmit={handleUpdate} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">Full Name</label>
-                            <input
-                                type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-                                placeholder="Employee Name"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">Email Address</label>
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-                                placeholder="email@company.com"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">User Role</label>
-                            <select
-                                value={role}
-                                onChange={(e) => setRole(e.target.value)}
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-                            >
-                                <option value="employee">Employee</option>
-                                <option value="manager">Manager</option>
-                            </select>
+                    <form onSubmit={handleUpdate} className="space-y-6">
+                        <div className="space-y-4">
+                            <div className="group">
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Full Name</label>
+                                <div className="relative">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                                        <User size={18} />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium text-slate-800"
+                                        placeholder="Enter full name"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="group">
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Email Address</label>
+                                <div className="relative">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                                        <Mail size={18} />
+                                    </div>
+                                    <input
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium text-slate-800"
+                                        placeholder="email@company.com"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="group">
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Account Role</label>
+                                <div className="relative">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                                        <Shield size={18} />
+                                    </div>
+                                    <select
+                                        value={role}
+                                        onChange={(e) => setRole(e.target.value)}
+                                        className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium text-slate-800 appearance-none"
+                                    >
+                                        <option value="employee">Employee (Standard Access)</option>
+                                        <option value="manager">Manager (Admin Access)</option>
+                                    </select>
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                            {onDelete && (
+                        <div className="flex items-center justify-between pt-6 mt-6 border-t border-slate-100">
+                            {onDelete ? (
                                 <button
                                     type="button"
                                     onClick={onDelete}
-                                    className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-colors border border-transparent hover:border-red-100"
+                                    className="flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-xl font-bold transition-all border border-transparent hover:border-red-100 group"
                                 >
-                                    Delete Account
+                                    <Trash2 size={18} className="group-hover:scale-110 transition-transform" />
+                                    <span>Delete</span>
                                 </button>
-                            )}
-                            <div className="flex gap-3 ml-auto">
+                            ) : <div></div>}
+
+                            <div className="flex gap-3">
                                 <button
                                     type="button"
                                     onClick={onCancel}
-                                    className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors"
+                                    className="px-6 py-2.5 text-slate-600 hover:bg-slate-50 rounded-xl font-bold transition-all"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl hover:from-indigo-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    className="flex items-center gap-2 px-8 py-2.5 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                 >
-                                    {loading ? 'Updating...' : 'Save Changes'}
+                                    {loading ? (
+                                        <>
+                                            <Loader2 size={18} className="animate-spin" />
+                                            <span>Saving...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Check size={18} />
+                                            <span>Save Changes</span>
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </div>

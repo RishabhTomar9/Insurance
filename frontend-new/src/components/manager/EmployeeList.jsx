@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from '../../services/firebase';
+import { useAuth } from '../../contexts/AuthContext';
 import EditEmployeeForm from './EditEmployeeForm';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirmed } from '../../contexts/DialogContext';
@@ -54,6 +55,7 @@ const PasswordCell = ({ tempPassword, passwordChanged }) => {
 
 const EmployeeList = () => {
 
+    const { currentUser } = useAuth();
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(true);
     const { addToast } = useToast();
@@ -61,8 +63,11 @@ const EmployeeList = () => {
     const [editingEmployee, setEditingEmployee] = useState(null);
 
     useEffect(() => {
-        // Real-time listener for all users (managers can see all users)
-        const unsub = onSnapshot(collection(db, 'users'), (snap) => {
+        if (!currentUser?.companyId) return;
+
+        // Real-time listener for users in same company
+        const q = query(collection(db, 'users'), where('companyId', '==', currentUser.companyId));
+        const unsub = onSnapshot(q, (snap) => {
             setEmployees(snap.docs.map(doc => ({ uid: doc.id, ...doc.data() })));
             setLoading(false);
         }, (error) => {
@@ -72,7 +77,7 @@ const EmployeeList = () => {
         });
 
         return () => unsub();
-    }, []);
+    }, [currentUser]);
 
     const handleDelete = async (uid) => {
         const confirmed = await showConfirm(

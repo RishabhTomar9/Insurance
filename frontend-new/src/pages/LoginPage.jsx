@@ -1,87 +1,47 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../services/firebase';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, ShieldCheck, ArrowRight, Building } from 'lucide-react';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { currentUser } = useAuth();
 
-    React.useEffect(() => {
+    const msg = searchParams.get('msg');
+
+    useEffect(() => {
         if (currentUser) {
-            if (currentUser.role === 'manager') navigate('/manager');
-            if (currentUser.role === 'employee') navigate('/employee');
+            if (currentUser.role === 'super-admin') navigate('/super-admin');
+            else if (currentUser.role === 'manager') navigate('/manager');
+            else if (currentUser.role === 'employee') navigate('/employee');
         }
     }, [currentUser, navigate]);
 
-    const handleManagerLogin = async () => {
-        const provider = new GoogleAuthProvider();
-        try {
-            const result = await signInWithPopup(auth, provider);
-            const user = result.user;
-
-            // Check Firestore for existing user profile
-            const userDocRef = doc(db, 'users', user.uid);
-            let userDocSnap = await getDoc(userDocRef);
-
-            // Super-Admin & Authorization Check
-            const superAdminEmails = ['rishabhtomar9999@gmail.com'];
-            const userEmailLower = user.email.toLowerCase();
-            const isAuthorizedEmail = superAdminEmails.includes(userEmailLower) ||
-                (await getDoc(doc(db, 'authorized_managers', userEmailLower))).exists();
-
-            if (isAuthorizedEmail) {
-                // If not in Firestore or role is not manager, create/update
-                if (!userDocSnap.exists() || userDocSnap.data().role !== 'manager') {
-                    await setDoc(userDocRef, {
-                        name: user.displayName || 'Manager',
-                        email: user.email,
-                        role: 'manager',
-                        updatedAt: serverTimestamp(),
-                        ...(userDocSnap.exists() ? {} : { createdAt: serverTimestamp() })
-                    }, { merge: true });
-
-                    // Refresh snapshot
-                    userDocSnap = await getDoc(userDocRef);
-                }
-            }
-
-            if (userDocSnap.exists() && userDocSnap.data().role === 'manager') {
-                navigate('/manager');
-            } else {
-                await auth.signOut();
-                setError('Manager access denied. This email is not authorized for manager access.');
-            }
-
-        } catch (error) {
-            console.error("Manager Login Error:", error);
-            setError(error.message);
-        }
-    };
-
-
-
-    const handleEmployeeLogin = async (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
         setError('');
+        setLoading(true);
 
         if (!email || !password) {
             setError('Please enter both email and password.');
+            setLoading(false);
             return;
         }
 
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            navigate('/employee');
+            // Redirection is handled by the useEffect above
         } catch (error) {
-            console.error("Login Error Details:", error);
+            console.error("Login Error:", error);
             let msg = 'Failed to sign in.';
             if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
                 msg = 'Invalid email or password.';
@@ -91,124 +51,133 @@ const LoginPage = () => {
                 msg = error.message;
             }
             setError(msg);
+            setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen flex bg-white font-['Poppins']">
-            {/* Left Side - Branding */}
-            <div className="hidden lg:flex lg:w-1/2 bg-slate-900 flex-col justify-center px-12 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-                    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
-                        <path d="M0 100 C 20 0 50 0 100 100 Z" fill="white" />
-                    </svg>
-                </div>
-                <div className="z-10 text-white">
-                    <div className="flex items-center space-x-3 mb-8">
-                        <span className="text-4xl">⚡</span>
-                        <h1 className="text-5xl font-bold tracking-tight">GRIVA CRM</h1>
+        <div className="min-h-screen flex bg-[#0b0e1a] font-['DM Sans']">
+            {/* Left Side - Luxury Branding */}
+            <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#0d1226] to-[#0b0e1a] flex-col justify-center px-20 border-r border-[#1e2745] relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-[120px] -mr-64 -mt-64" />
+                <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-emerald-600/5 rounded-full blur-[120px] -ml-64 -mb-64" />
+
+                <div className="z-10 space-y-8">
+                    <div className="flex items-center space-x-4">
+                        <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-600/20">
+                            <ShieldCheck className="w-10 h-10 text-white" />
+                        </div>
+                        <h1 className="text-4xl font-extrabold text-white font-['Rajdhani'] tracking-[4px]">GRIVA CRM v2</h1>
                     </div>
-                    <p className="text-xl text-slate-400 max-w-md leading-relaxed">
-                        The next generation insurance management platform. Manage policies, track assets, and empower your workforce.
-                    </p>
-                    <div className="mt-12 flex space-x-4">
-                        <div className="px-4 py-2 bg-slate-800 rounded-lg text-sm text-slate-300">Secure</div>
-                        <div className="px-4 py-2 bg-slate-800 rounded-lg text-sm text-slate-300">Fast</div>
-                        <div className="px-4 py-2 bg-slate-800 rounded-lg text-sm text-slate-300">Reliable</div>
+
+                    <div className="space-y-4">
+                        <h2 className="text-5xl font-bold text-white leading-tight">
+                            The New Standard <br />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-emerald-400">
+                                in Policy Control.
+                            </span>
+                        </h2>
+                        <p className="text-[#6b7db3] text-lg max-w-lg leading-relaxed">
+                            Experience a unified ecosystem for insurance management. Secure, multi-tenant architecture designed for scale.
+                        </p>
+                    </div>
+
+                    <div className="pt-8 flex gap-3">
+                        {['RELIABLE', 'SECURE', 'SCALABLE'].map(item => (
+                            <div key={item} className="px-4 py-2 bg-[#111629] border border-[#1e2745] rounded-xl text-[10px] text-[#6b7db3] font-bold tracking-[2px]">
+                                {item}
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>
 
-            {/* Right Side - Login Forms */}
-            <div className="flex-1 flex flex-col justify-center items-center p-8 bg-slate-50">
-                <div className="w-full max-w-md space-y-8 bg-white p-10 rounded-2xl shadow-xl">
-                    <div className="text-center">
-                        <h2 className="text-3xl font-bold text-slate-900">Welcome Back</h2>
-                        <p className="mt-2 text-sm text-slate-500">Sign in to your account</p>
+            {/* Right Side - Login Form */}
+            <div className="flex-1 flex flex-col justify-center items-center p-8 bg-[#0b0e1a]">
+                <div className="w-full max-w-md space-y-10">
+                    <div className="text-center space-y-2">
+                        <h2 className="text-3xl font-bold text-white font-['Rajdhani'] tracking-widest uppercase">SIGN IN</h2>
+                        <p className="text-[#6b7db3] text-sm uppercase tracking-[2px]">Enter credentials to access portal</p>
                     </div>
 
-                    {error && (
-                        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
-                            <div className="flex">
-                                <div className="flex-shrink-0">
-                                    <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                                    </svg>
-                                </div>
-                                <div className="ml-3">
-                                    <p className="text-sm text-red-700">{error}</p>
-                                </div>
-                            </div>
+                    {msg === 'initialized' && (
+                        <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl text-emerald-400 text-sm flex items-center gap-3">
+                            <ShieldCheck className="w-5 h-5 shrink-0" />
+                            <span>Initialization successful! You can now log in.</span>
                         </div>
                     )}
 
-                    <div className="space-y-6">
-                        {/* Manager Login Section */}
-                        <div className="pb-6 border-b border-slate-100">
-                            <button
-                                onClick={handleManagerLogin}
-                                className="w-full flex items-center justify-center space-x-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium py-3 px-4 rounded-lg transition-all transform hover:scale-[1.02] duration-200 shadow-sm"
-                            >
-                                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                                </svg>
-                                <span>Manager Login (Google)</span>
-                            </button>
-                        </div>
-
-                        {/* Employee Login Section */}
-                        <div>
-                            <div className="relative flex items-center justify-center mb-6">
-                                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-200"></span></div>
-                                <div className="relative bg-white px-4 text-sm text-slate-400">Or Employee Login</div>
+                    <div className="bg-[#111629] border border-[#1e2745] p-10 rounded-3xl shadow-2xl relative">
+                        {error && (
+                            <div className="mb-6 bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl text-rose-400 text-xs text-center">
+                                {error}
                             </div>
-                            <form onSubmit={handleEmployeeLogin} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+                        )}
+
+                        <form onSubmit={handleLogin} className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] uppercase tracking-widest text-[#6b7db3] font-bold">Email Address</label>
+                                <div className="relative">
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#3d7fff]" />
                                     <input
                                         type="email"
-                                        placeholder="name@griva.com"
+                                        placeholder="your@email.com"
                                         value={email}
-                                        name="email"
-                                        autoComplete="email"
                                         onChange={(e) => setEmail(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all text-slate-800 placeholder-slate-400"
+                                        className="w-full bg-[#0b0e1a] border border-[#1e2745] rounded-xl py-4 pl-12 pr-4 text-sm text-white focus:border-[#3d7fff] outline-none transition-all placeholder:text-[#2a3660]"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                                    <div className="relative">
-                                        <input
-                                            type={showPassword ? "text" : "password"}
-                                            placeholder="••••••••"
-                                            value={password}
-                                            name="password"
-                                            autoComplete="current-password"
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all text-slate-800 placeholder-slate-400 pr-10"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
-                                        >
-                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                        </button>
-                                    </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-[10px] uppercase tracking-widest text-[#6b7db3] font-bold">Password</label>
+                                    <button type="button" onClick={() => navigate('/reset-password')} className="text-[10px] uppercase tracking-widest text-[#3d7fff] font-bold hover:underline">Forgot?</button>
                                 </div>
-                                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg shadow-indigo-200">
-                                    Sign In as Employee
-                                </button>
-                            </form>
+                                <div className="relative">
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#3d7fff]" />
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="••••••••"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full bg-[#0b0e1a] border border-[#1e2745] rounded-xl py-4 pl-12 pr-4 text-sm text-white focus:border-[#3d7fff] outline-none transition-all placeholder:text-[#2a3660] pr-12"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-[#2a3660] hover:text-[#3d7fff] transition-colors"
+                                    >
+                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full group relative flex items-center justify-center py-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-2xl transition-all shadow-xl disabled:opacity-50"
+                            >
+                                {loading ? 'AUTHENTICATING...' : 'ACCESS PORTAL'}
+                                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                            </button>
+                        </form>
+                    </div>
+
+                    <div className="text-center space-y-4">
+                        <div className="flex items-center justify-center gap-4 text-[#2a3660]">
+                            <div className="h-px w-12 bg-[#1e2745]" />
+                            <span className="text-[10px] uppercase tracking-widest font-bold">New Company?</span>
+                            <div className="h-px w-12 bg-[#1e2745]" />
                         </div>
+                        <button
+                            onClick={() => navigate('/register-company')}
+                            className="flex items-center justify-center gap-2 mx-auto py-3 px-6 bg-[#111629] border border-[#1e2745] rounded-xl text-white text-[10px] uppercase tracking-widest font-bold hover:border-[#3d7fff] transition-all"
+                        >
+                            <Building className="w-4 h-4 text-[#3d7fff]" /> Register Your Business
+                        </button>
                     </div>
                 </div>
-                <p className="mt-8 text-center text-sm text-slate-400">
-                    &copy; 2026 Griva Insurance. All rights reserved.
-                </p>
             </div>
         </div>
     );

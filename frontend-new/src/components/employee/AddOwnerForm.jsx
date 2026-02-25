@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { auth, db } from '../../services/firebase';
 import { X, User, Phone, MapPin, Mail, CreditCard, FileText } from 'lucide-react';
 
@@ -32,6 +32,12 @@ const AddOwnerForm = ({ onAdd, onCancel, employees = [], isManager = false }) =>
             const user = auth.currentUser;
             if (!user) throw new Error('Not authenticated');
 
+            // Find current user's profile for companyId
+            const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+            const companyId = userDocSnap.exists() ? userDocSnap.data().companyId : null;
+
+            if (!companyId) throw new Error('Company ID not found. Please re-login.');
+
             const payload = {
                 name: formData.ownerName,
                 phone: formData.mobileNo,
@@ -40,6 +46,7 @@ const AddOwnerForm = ({ onAdd, onCancel, employees = [], isManager = false }) =>
                 aadharCard: formData.aadharCard,
                 drivingLicense: formData.drivingLicense,
                 employeeId: formData.employeeId || user.uid,
+                companyId: companyId,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             };
@@ -97,7 +104,7 @@ const AddOwnerForm = ({ onAdd, onCancel, employees = [], isManager = false }) =>
                                         >
                                             <option value="">-- Assign to Me (Current User) --</option>
                                             {employees.map(emp => (
-                                                <option key={emp.uid} value={emp.uid}>{emp.email}</option>
+                                                <option key={emp.id || emp.uid} value={emp.id || emp.uid}>{emp.email}</option>
                                             ))}
                                         </select>
                                     </div>

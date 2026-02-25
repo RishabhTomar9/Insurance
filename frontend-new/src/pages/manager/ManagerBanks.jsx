@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, where } from 'firebase/firestore';
 import { db } from '../../services/firebase';
+import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirmed } from '../../contexts/DialogContext';
 
 const ManagerBanks = () => {
+    const { currentUser } = useAuth();
     const { addToast } = useToast();
     const { showConfirm } = useConfirmed();
     const [banks, setBanks] = useState([]);
@@ -23,7 +25,13 @@ const ManagerBanks = () => {
     const [formData, setFormData] = useState(initialFormState);
 
     useEffect(() => {
-        const banksQuery = query(collection(db, 'banks'), orderBy('bankName', 'asc'));
+        if (!currentUser?.companyId) return;
+
+        const banksQuery = query(
+            collection(db, 'banks'),
+            where('companyId', '==', currentUser.companyId),
+            orderBy('bankName', 'asc')
+        );
         const unsub = onSnapshot(banksQuery, (snap) => {
             setBanks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             setLoading(false);
@@ -34,7 +42,7 @@ const ManagerBanks = () => {
         });
 
         return () => unsub();
-    }, []);
+    }, [currentUser]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -50,6 +58,7 @@ const ManagerBanks = () => {
             } else {
                 await addDoc(collection(db, 'banks'), {
                     ...payload,
+                    companyId: currentUser.companyId,
                     createdAt: serverTimestamp()
                 });
                 addToast('Bank added successfully', 'success');

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { auth, db } from '../../services/firebase';
 import { X, Car, User, FileText, ChevronDown, ChevronUp, CheckCircle, AlertCircle } from 'lucide-react';
 
@@ -58,12 +58,19 @@ const AddCarForm = ({ onAdd, onClose, employees = [], isManager = false }) => {
             const user = auth.currentUser;
             if (!user) throw new Error('Not authenticated');
 
+            // Find current user's profile for companyId
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            const companyId = userDoc.exists() ? userDoc.data().companyId : null;
+
+            if (!companyId) throw new Error('Company ID not found. Please re-login.');
+
             const currentEmployeeId = vehicleData.employeeId || user.uid;
 
             // 1. Create Car
             const carPayload = {
                 ...vehicleData,
                 employeeId: currentEmployeeId,
+                companyId: companyId,
                 agentDetails: {
                     name: vehicleData.agentName,
                     mobile: vehicleData.agentMobile,
@@ -88,6 +95,7 @@ const AddCarForm = ({ onAdd, onClose, employees = [], isManager = false }) => {
                     ...ownerData,
                     phone: ownerData.mobile,
                     employeeId: currentEmployeeId,
+                    companyId: companyId,
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp()
                 };
@@ -105,6 +113,7 @@ const AddCarForm = ({ onAdd, onClose, employees = [], isManager = false }) => {
                     carId: newCarId,
                     ownerId: newOwnerId,
                     employeeId: currentEmployeeId,
+                    companyId: companyId,
                     premiumAmount: parseFloat(policyData.premiumAmount) || 0,
                     finalPremium: parseFloat(policyData.premiumAmount) || 0,
                     createdAt: serverTimestamp(),
@@ -180,7 +189,7 @@ const AddCarForm = ({ onAdd, onClose, employees = [], isManager = false }) => {
                                     className="w-full p-3 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                                 >
                                     <option value="">-- Assign to Me --</option>
-                                    {employees.map(e => <option key={e.uid || e._id} value={e.uid || e._id}>{e.email}</option>)}
+                                    {employees.map(e => <option key={e.id || e.uid} value={e.id || e.uid}>{e.email}</option>)}
                                 </select>
                             </div>
                         )}

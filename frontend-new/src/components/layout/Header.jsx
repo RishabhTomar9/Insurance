@@ -1,28 +1,51 @@
 import React from 'react';
-import { auth } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { Bell, Search, Settings, Command } from 'lucide-react';
 
 const Header = () => {
     const { currentUser } = useAuth();
 
     return (
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-10 sticky top-0">
-            <div className="flex items-center">
-                <h2 className="text-xl font-semibold text-slate-800">
-                    Welcome back, <span className="text-indigo-600">{currentUser?.displayName?.split(' ')[0]}</span>
-                </h2>
+        <header className="h-20 bg-[#0b0e1a] border-b border-[#1e2745] flex items-center justify-between px-10 sticky top-0 z-10 backdrop-blur-md bg-opacity-80">
+            <div className="flex items-center gap-6">
+                <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-[#111629] border border-[#1e2745] rounded-xl group focus-within:border-blue-500 transition-all w-80">
+                    <Search className="w-4 h-4 text-[#6b7db3] group-focus-within:text-blue-500" />
+                    <input
+                        type="text"
+                        placeholder="QUICK FIND..."
+                        className="bg-transparent border-none outline-none text-xs text-white uppercase tracking-widest w-full placeholder:text-[#2a3660]"
+                    />
+                    <div className="flex items-center gap-1 px-1.5 py-1 bg-[#0b0e1a] border border-[#1e2745] rounded text-[8px] text-[#6b7db3] font-bold">
+                        <Command className="w-2 h-2" /> K
+                    </div>
+                </div>
             </div>
-            <div className="flex items-center space-x-4">
-                <button className="p-2 text-slate-400 hover:text-indigo-600 transition-colors">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+
+            <div className="flex items-center gap-6">
+                <button className="relative p-2 text-[#6b7db3] hover:text-white transition-colors">
+                    <Bell className="w-5 h-5" />
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-[#0b0e1a]" />
                 </button>
-                <div className="h-8 w-px bg-slate-200 mx-2"></div>
-                <button
-                    onClick={() => auth.signOut()}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg transition-colors"
-                >
-                    Logout
+
+                <button className="p-2 text-[#6b7db3] hover:text-white transition-colors">
+                    <Settings className="w-5 h-5" />
                 </button>
+
+                <div className="h-6 w-px bg-[#1e2745]" />
+
+                <div className="flex items-center gap-4">
+                    <div className="text-right hidden sm:block">
+                        <p className="text-[10px] uppercase tracking-widest font-bold text-white">
+                            {currentUser?.displayName || 'Session Active'}
+                        </p>
+                        <p className="text-[8px] uppercase tracking-[2px] text-emerald-500 font-bold">Online</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 p-[1px] shadow-lg shadow-blue-500/10">
+                        <div className="w-full h-full bg-[#0b0e1a] rounded-[11px] flex items-center justify-center">
+                            <span className="text-xs font-bold text-white uppercase">{currentUser?.displayName?.[0] || 'A'}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </header>
     );

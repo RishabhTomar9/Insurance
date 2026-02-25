@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { auth, db } from '../../services/firebase';
 import { X, FileText, Calendar, IndianRupee, Shield, Clock, Plus, Trash2, ChevronDown, ChevronUp, Briefcase, CreditCard, User, Landmark } from 'lucide-react';
 
@@ -141,9 +141,16 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
             const user = auth.currentUser;
             if (!user) throw new Error('Not authenticated');
 
+            // Find current user's profile for companyId
+            const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+            const companyId = userDocSnap.exists() ? userDocSnap.data().companyId : null;
+
+            if (!companyId) throw new Error('Company ID not found. Please re-login.');
+
             const payload = {
                 // Basic
                 employeeId: basicData.employeeId || user.uid,
+                companyId: companyId,
                 carId: basicData.carId,
                 ownerId: basicData.ownerId,
                 agentName: basicData.agentName,
@@ -243,7 +250,7 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
                                         className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                                     >
                                         <option value="">-- Assign to Me --</option>
-                                        {employees.map(e => <option key={e.uid || e._id} value={e.uid || e._id}>{e.email}</option>)}
+                                        {employees.map(e => <option key={e.id || e.uid} value={e.id || e.uid}>{e.email}</option>)}
                                     </select>
                                 </div>
                             )}
@@ -254,7 +261,7 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
                                     className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                                 >
                                     <option value="">-- Select Vehicle --</option>
-                                    {cars.map(c => <option key={c._id} value={c._id}>{c.vehicleNumber} ({c.make})</option>)}
+                                    {cars.map(c => <option key={c.id} value={c.id}>{c.vehicleNumber} ({c.make})</option>)}
                                 </select>
                             </div>
                             <div className="group">
@@ -264,7 +271,7 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
                                     className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                                 >
                                     <option value="">-- Select Owner --</option>
-                                    {owners.map(o => <option key={o._id} value={o._id}>{o.name}</option>)}
+                                    {owners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                                 </select>
                             </div>
                             <div className="group">

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, query, where, onSnapshot, deleteDoc, collection } from 'firebase/firestore';
 import { db, auth, firebaseConfig } from '../../services/firebase';
 
 import { useToast } from '../../contexts/ToastContext';
@@ -10,7 +10,7 @@ import EmployeeList from '../../components/manager/EmployeeList';
 
 const ManagerEmployees = () => {
     const { currentUser } = useAuth(); // Moved useAuth call to component level
-    const isSuperAdmin = currentUser?.role === 'super-admin' || currentUser?.email === 'rishabhtomar9999@gmail.com'; // Updated isSuperAdmin definition
+    const isSuperAdmin = currentUser?.role === 'super-admin'; // Updated isSuperAdmin definition
     const [showInstructions, setShowInstructions] = useState(false);
     const [authEmail, setAuthEmail] = useState('');
     const [empName, setEmpName] = useState('');
@@ -32,10 +32,11 @@ const ManagerEmployees = () => {
             const emailKey = authEmail.trim().toLowerCase();
             await setDoc(doc(db, 'authorized_managers', emailKey), {
                 email: emailKey,
-                authorizedBy: auth.currentUser.email,
+                authorizedBy: currentUser.email,
+                companyId: currentUser.companyId, // Include companyId for provisioning
                 createdAt: serverTimestamp()
             });
-            addToast(`Email ${emailKey} authorized as Manager`, 'success');
+            addToast(`Email ${emailKey} authorized as Manager for your enterprise`, 'success');
             setAuthEmail('');
         } catch (error) {
             console.error(error);
@@ -128,32 +129,37 @@ const ManagerEmployees = () => {
                 <div className="lg:col-span-1 space-y-6">
                     {/* Authorization Form - ONLY FOR SUPER ADMIN */}
                     {isSuperAdmin && (
-                        <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-6 rounded-xl shadow-lg border border-indigo-500">
-                            <h3 className="text-lg font-bold text-white mb-4 flex items-center">
-                                <span className="w-8 h-8 rounded-lg bg-white/20 text-white flex items-center justify-center mr-2 text-sm border border-white/30">SA</span>
-                                Authorize New Manager
-                            </h3>
-                            <form onSubmit={handleAuthorizeManager} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-indigo-100 mb-1">Google Email</label>
-                                    <input
-                                        type="email"
-                                        value={authEmail}
-                                        onChange={(e) => setAuthEmail(e.target.value)}
-                                        placeholder="manager@gmail.com"
-                                        className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 focus:ring-2 focus:ring-white outline-none transition-all placeholder:text-white/40 text-white"
-                                        required
-                                    />
-                                    <p className="mt-2 text-xs text-indigo-100/70">Managers can create employees but not other managers.</p>
-                                </div>
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="w-full bg-white text-indigo-600 font-bold py-2 rounded-lg transition-all hover:bg-indigo-50 disabled:opacity-50"
-                                >
-                                    {loading ? 'Processing...' : 'Authorize Manager'}
-                                </button>
-                            </form>
+                        <div className="space-y-6">
+                            <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-6 rounded-xl shadow-lg border border-indigo-500">
+                                <h3 className="text-lg font-bold text-white mb-4 flex items-center">
+                                    <span className="w-8 h-8 rounded-lg bg-white/20 text-white flex items-center justify-center mr-2 text-sm border border-white/30">SA</span>
+                                    Authorize New Manager
+                                </h3>
+                                <form onSubmit={handleAuthorizeManager} className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-indigo-100 mb-1">Google Email</label>
+                                        <input
+                                            type="email"
+                                            value={authEmail}
+                                            onChange={(e) => setAuthEmail(e.target.value)}
+                                            placeholder="manager@gmail.com"
+                                            className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 focus:ring-2 focus:ring-white outline-none transition-all placeholder:text-white/40 text-white"
+                                            required
+                                        />
+                                        <p className="mt-2 text-xs text-indigo-100/70">Managers can create employees but not other managers.</p>
+                                    </div>
+                                    <button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="w-full bg-white text-indigo-600 font-bold py-2 rounded-lg transition-all hover:bg-indigo-50 disabled:opacity-50"
+                                    >
+                                        {loading ? 'Processing...' : 'Authorize Manager'}
+                                    </button>
+                                </form>
+                            </div>
+
+                            {/* Authorized List Preview */}
+                            <AuthorizedManagersList />
                         </div>
                     )}
 
@@ -243,6 +249,53 @@ const ManagerEmployees = () => {
 
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <EmployeeList />
+            </div>
+        </div>
+    );
+};
+
+const AuthorizedManagersList = () => {
+    const [list, setList] = React.useState([]);
+    const { currentUser } = useAuth();
+    const { addToast } = useToast();
+
+    React.useEffect(() => {
+        if (!currentUser?.companyId) return;
+        const q = query(collection(db, 'authorized_managers'), where('companyId', '==', currentUser.companyId));
+        return onSnapshot(q, (snap) => {
+            setList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+    }, [currentUser]);
+
+    const removeAuth = async (email) => {
+        try {
+            await deleteDoc(doc(db, 'authorized_managers', email));
+            addToast(`Authorization removed for ${email}`, 'info');
+        } catch (e) {
+            addToast('Error removing authorization', 'error');
+        }
+    };
+
+    if (list.length === 0) return null;
+
+    return (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Pending Authorizations</h4>
+            <div className="space-y-3">
+                {list.map(item => (
+                    <div key={item.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-700 truncate">{item.email}</p>
+                            <p className="text-[10px] text-slate-400">Authorized {new Date(item.createdAt?.seconds * 1000).toLocaleDateString()}</p>
+                        </div>
+                        <button
+                            onClick={() => removeAuth(item.id)}
+                            className="p-1 px-2 text-[10px] font-bold text-rose-500 hover:bg-rose-50 rounded transition-colors"
+                        >
+                            REVOKE
+                        </button>
+                    </div>
+                ))}
             </div>
         </div>
     );

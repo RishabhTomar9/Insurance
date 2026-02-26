@@ -56,6 +56,7 @@ const Sidebar = () => {
                     <>
                         <div className="px-6 pt-6 pb-2 text-[10px] font-bold text-[#2a3660] uppercase tracking-[3px]">Governance</div>
                         <NavItem to="/super-admin/managers" icon={Users} label="Managers" />
+                        <NavItem to="/super-admin/settings" icon={Settings} label="Enterprise Settings" />
                     </>
                 )}
 
@@ -72,7 +73,7 @@ const Sidebar = () => {
                 <NavItem to={`${getBaseRoute()}/agents`} icon={ShieldAlert} label="Agent Master" />
 
                 {(role === 'manager' || role === 'super-admin') && (
-                    <NavItem to="/manager/banks" icon={Landmark} label="Bank Catalog" />
+                    <NavItem to={`${getBaseRoute()}/banks`} icon={Landmark} label="Bank Catalog" />
                 )}
 
                 <div className="px-6 pt-6 pb-2 text-[10px] font-bold text-[#2a3660] uppercase tracking-[3px]">Operations</div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { updatePassword } from 'firebase/auth';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -41,14 +41,19 @@ const PasswordResetPage = () => {
       await updatePassword(user, newPassword);
 
       // Update user status in Firestore
-      await updateDoc(doc(db, 'users', user.uid), {
+      await setDoc(doc(db, 'users', user.uid), {
         passwordChanged: true,
         updatedAt: serverTimestamp()
-      });
+      }, { merge: true });
 
       if (refreshUserData) await refreshUserData();
       addToast('Password changed successfully!', 'success');
-      navigate('/employee');
+
+      // Determine redirection based on role
+      const role = currentUser?.role || 'employee';
+      if (role === 'super-admin') navigate('/super-admin');
+      else if (role === 'manager') navigate('/manager');
+      else navigate('/employee');
     } catch (error) {
 
 

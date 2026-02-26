@@ -5,6 +5,7 @@ import Loader from './components/common/Loader';
 
 // Lazy Load Pages
 const LoginPage = lazy(() => import('./pages/LoginPage'));
+const SuperAdminLoginPage = lazy(() => import('./pages/SuperAdminLoginPage'));
 const PasswordResetPage = lazy(() => import('./pages/PasswordResetPage'));
 const CompanyRegistrationPage = lazy(() => import('./pages/CompanyRegistrationPage'));
 const SuperAdminInitPage = lazy(() => import('./pages/SuperAdminInitPage'));
@@ -13,6 +14,7 @@ const DashboardLayout = lazy(() => import('./components/layout/DashboardLayout')
 // Super Admin Pages
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
 const ManagerEmployees = lazy(() => import('./pages/manager/ManagerEmployees'));
+const SuperAdminSettings = lazy(() => import('./pages/SuperAdminSettings'));
 
 // Manager Pages
 const ManagerDashboard = lazy(() => import('./pages/ManagerDashboard'));
@@ -35,6 +37,7 @@ const App = () => {
         <Suspense fallback={<Loader />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/login-superadmin" element={<SuperAdminLoginPage />} />
             <Route path="/register-company" element={<CompanyRegistrationPage />} />
             <Route path="/reset-password" element={<PasswordResetPage />} />
             <Route path="/superadmin-init" element={<SuperAdminInitPage />} />
@@ -58,7 +61,9 @@ const App = () => {
                 <Route path="cars" element={<ManagerCars />} />
                 <Route path="owners" element={<ManagerOwners />} />
                 <Route path="policies" element={<ManagerPolicies />} />
+                <Route path="banks" element={<ManagerBanks />} />
                 <Route path="agents" element={<ManagerAgents />} />
+                <Route path="settings" element={<SuperAdminSettings />} />
               </Route>
             </Route>
 
@@ -86,11 +91,17 @@ const ProtectedRoute = ({ role }) => {
     return <Navigate to="/login" />;
   }
 
+  // Super Admin can access everything
+  if (currentUser.role === 'super-admin') {
+    return <Outlet />;
+  }
+
   const allowedRoles = Array.isArray(role) ? role : [role];
   if (!allowedRoles.includes(currentUser.role)) {
     return <Navigate to="/login" />;
   }
 
+  // Mandatory password reset for employees
   if (currentUser.role === 'employee' && !currentUser.passwordChanged) {
     return <Navigate to="/reset-password" />;
   }

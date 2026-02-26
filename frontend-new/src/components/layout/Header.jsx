@@ -1,9 +1,11 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { Bell, Search, Settings, Command } from 'lucide-react';
 
 const Header = () => {
     const { currentUser } = useAuth();
+    const navigate = useNavigate();
 
     return (
         <header className="h-20 bg-[#0b0e1a] border-b border-[#1e2745] flex items-center justify-between px-10 sticky top-0 z-10 backdrop-blur-md bg-opacity-80">
@@ -27,7 +29,13 @@ const Header = () => {
                     <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-[#0b0e1a]" />
                 </button>
 
-                <button className="p-2 text-[#6b7db3] hover:text-white transition-colors">
+                <button
+                    onClick={() => {
+                        const path = currentUser?.role === 'super-admin' ? '/super-admin/settings' : '/settings';
+                        navigate(path);
+                    }}
+                    className="p-2 text-[#6b7db3] hover:text-white transition-colors"
+                >
                     <Settings className="w-5 h-5" />
                 </button>
 

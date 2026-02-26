@@ -202,7 +202,7 @@ const OwnerList = () => {
                             }}
                             onCancel={() => setIsAddModalOpen(false)}
                             employees={employees}
-                            isManager={currentUser?.role === 'manager'}
+                            isManager={currentUser?.role === 'manager' || currentUser?.role === 'super-admin'}
                         />
                     )}
 
@@ -214,7 +214,7 @@ const OwnerList = () => {
                             }}
                             onCancel={() => setEditingOwner(null)}
                             employees={employees}
-                            isManager={currentUser?.role === 'manager'}
+                            isManager={currentUser?.role === 'manager' || currentUser?.role === 'super-admin'}
                         />
                     )}
                 </div>

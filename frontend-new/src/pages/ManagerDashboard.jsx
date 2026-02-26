@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -8,22 +8,24 @@ const ManagerDashboard = () => {
     const [stats, setStats] = useState({ cars: 0, owners: 0, policies: 0, employees: 0 });
 
     useEffect(() => {
-        if (!currentUser) return;
+        if (!currentUser?.companyId) return;
 
-        // Stats listeners
-        const unsubCars = onSnapshot(collection(db, 'cars'), (snap) => {
+        const companyId = currentUser.companyId;
+
+        // Stats listeners - filtered by companyId
+        const unsubCars = onSnapshot(query(collection(db, 'cars'), where('companyId', '==', companyId)), (snap) => {
             setStats(prev => ({ ...prev, cars: snap.size }));
         });
 
-        const unsubOwners = onSnapshot(collection(db, 'owners'), (snap) => {
+        const unsubOwners = onSnapshot(query(collection(db, 'owners'), where('companyId', '==', companyId)), (snap) => {
             setStats(prev => ({ ...prev, owners: snap.size }));
         });
 
-        const unsubPolicies = onSnapshot(collection(db, 'policies'), (snap) => {
+        const unsubPolicies = onSnapshot(query(collection(db, 'policies'), where('companyId', '==', companyId)), (snap) => {
             setStats(prev => ({ ...prev, policies: snap.size }));
         });
 
-        const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+        const unsubUsers = onSnapshot(query(collection(db, 'users'), where('companyId', '==', companyId)), (snap) => {
             setStats(prev => ({ ...prev, employees: snap.size }));
         });
 

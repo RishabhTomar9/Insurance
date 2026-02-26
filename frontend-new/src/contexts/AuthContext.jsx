@@ -25,19 +25,28 @@ export const AuthProvider = ({ children }) => {
           setCurrentUser({
             ...user,
             ...userData,
-            role: token.claims.role || userData.role,
-            employeeId: userData.employeeId
+            role: token.claims.role || userData.role || 'employee',
+            companyId: userData.companyId || null
           });
         } else {
-          console.warn('User document not found in Firestore');
+          // New user logic: document doesn't exist yet
+          console.log(`Initial login for UID: ${user.uid}. Awaiting provisioning...`);
           setCurrentUser({
             ...user,
-            role: token.claims.role
+            role: token.claims.role || 'employee',
+            companyId: null,
+            isNewUser: true
           });
         }
       } catch (error) {
-        console.error('Error fetching user data from Firestore:', error);
-        setCurrentUser(user);
+        console.error('Core Auth Fetch Error:', error);
+        // Fallback to basic auth state to avoid crash
+        setCurrentUser({
+          ...user,
+          role: 'employee',
+          companyId: null,
+          isErrorState: true
+        });
       }
     } else {
       setCurrentUser(null);

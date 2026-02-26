@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import {
   getFirestore,
   initializeFirestore,
@@ -20,6 +20,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
 
 // Initialize Firestore with persistent cache for high performance
 const db = initializeFirestore(app, {
@@ -28,4 +29,4 @@ const db = initializeFirestore(app, {
   })
 });
 
-export { auth, db, firebaseConfig };
+export { auth, db, firebaseConfig, googleProvider };

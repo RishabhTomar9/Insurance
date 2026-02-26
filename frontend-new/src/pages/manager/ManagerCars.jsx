@@ -202,7 +202,7 @@ const ManagerCars = () => {
                             }}
                             onClose={() => setIsAddModalOpen(false)}
                             employees={employees}
-                            isManager={currentUser?.role === 'manager'}
+                            isManager={currentUser?.role === 'manager' || currentUser?.role === 'super-admin'}
                         />
                     )}
 
@@ -214,7 +214,7 @@ const ManagerCars = () => {
                             }}
                             onCancel={() => setEditingCar(null)}
                             employees={employees}
-                            isManager={currentUser?.role === 'manager'}
+                            isManager={currentUser?.role === 'manager' || currentUser?.role === 'super-admin'}
                         />
                     )}
 

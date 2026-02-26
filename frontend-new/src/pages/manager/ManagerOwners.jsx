@@ -4,11 +4,11 @@ import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirmed } from '../../contexts/DialogContext';
-import { Plus, Edit2, Trash2, Users, Search, Mail, Phone, MapPin, CreditCard, FileText } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users, Search, Mail, Phone, MapPin, CreditCard, ArrowUpRight } from 'lucide-react';
 import AddOwnerForm from '../../components/employee/AddOwnerForm';
 import EditOwnerForm from '../../components/employee/EditOwnerForm';
 
-const OwnerList = () => {
+const ManagerOwners = () => {
     const { currentUser } = useAuth();
     const { addToast } = useToast();
     const { showConfirm } = useConfirmed();
@@ -22,7 +22,7 @@ const OwnerList = () => {
     useEffect(() => {
         if (!currentUser) return;
 
-        const isManager = currentUser.role === 'manager' || currentUser.role === 'super-admin';
+        const isManager = currentUser.role === 'manager' || currentUser.role === 'super-admin' || currentUser.role === 'admin';
         const companyId = currentUser.companyId;
 
         if (!companyId) return;
@@ -62,7 +62,7 @@ const OwnerList = () => {
 
     const handleDelete = async (id) => {
         const confirmed = await showConfirm(
-            'Delete Owner Record',
+            'Delete Owner',
             'Are you sure you want to permanently delete this owner? This action cannot be undone.',
             'danger'
         );
@@ -70,7 +70,7 @@ const OwnerList = () => {
 
         try {
             await deleteDoc(doc(db, 'owners', id));
-            addToast('Owner record deleted', 'info');
+            addToast('Owner deleted successfully', 'info');
         } catch (error) {
             console.error(error);
             addToast('Failed to delete owner', 'error');
@@ -84,144 +84,166 @@ const OwnerList = () => {
     );
 
     if (loading) return (
-        <div className="flex items-center justify-center min-h-[400px] text-slate-500 animate-pulse">
-            <Users size={32} className="mr-3" />
-            <span className="text-lg font-medium">Syncing client database...</span>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+            <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+            <p className="text-[#6b7db3] font-bold uppercase tracking-widest text-sm text-center px-4">Loading Owner List...</p>
         </div>
     );
 
     const showForm = isAddModalOpen || editingOwner;
 
     return (
-        <div className="relative min-h-screen bg-slate-50">
-            {/* List View */}
+        <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+            {/* Page Header */}
             {!showForm && (
-                <div className="space-y-8 animate-fadeIn p-6">
-                    {/* Header */}
-                    <div className="flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <>
+                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
                         <div>
-                            <h1 className="text-3xl font-bold text-slate-800 mb-2">Owner Management</h1>
-                            <p className="text-slate-500">Manage client details and documentation.</p>
+                            <h1 className="text-3xl font-bold text-white font-bold tracking-widest uppercase flex items-center gap-3">
+                                <Users className="text-emerald-500 w-8 h-8" />
+                                Owner List
+                            </h1>
+                            <p className="text-[#6b7db3] text-xs mt-1 uppercase tracking-[2px]">Manage all vehicle owners</p>
                         </div>
-                        <div className="flex items-center space-x-4 mt-4 md:mt-0 w-full md:w-auto">
-                            <div className="relative group w-full md:w-64">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Search className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                                </div>
+
+                        <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto">
+                            <div className="relative group flex-1 sm:w-80">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6b7db3] group-focus-within:text-emerald-500 transition-colors" />
                                 <input
                                     type="text"
-                                    placeholder="Search owners..."
+                                    placeholder="SEARCH OWNERS..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all shadow-sm"
+                                    className="w-full bg-[#111629] border border-[#1e2745] text-white text-[10px] font-bold uppercase tracking-widest rounded-xl py-3 pl-12 pr-4 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-[#2a3660]"
                                 />
                             </div>
                             <button
                                 onClick={() => setIsAddModalOpen(true)}
-                                className="flex items-center space-x-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all shadow-lg shadow-indigo-200 active:scale-95 whitespace-nowrap font-medium"
+                                className="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
                             >
-                                <Plus size={20} />
-                                <span>Add New Owner</span>
+                                <Plus size={16} /> Add Owner
                             </button>
                         </div>
                     </div>
 
-                    {/* Grid */}
+                    {/* Registry Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredOwners.map(owner => (
-                            <div key={owner.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-indigo-300 transition-all duration-300 group relative overflow-hidden flex flex-col">
-                                <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-10 transition-opacity">
-                                    <Users size={100} className="text-indigo-900 transform rotate-12 translate-x-4 -translate-y-4" />
-                                </div>
+                            <div key={owner.id} className="bg-[#111629] border border-[#1e2745] rounded-3xl p-6 group hover:border-emerald-500/50 transition-all relative overflow-hidden flex flex-col h-full">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-600/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-emerald-600/10 transition-all" />
 
-                                <div className="relative z-10 flex-1">
-                                    <div className="flex items-start justify-between mb-4">
-                                        <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-xl shadow-inner">
+                                <div className="relative z-10 flex flex-col h-full">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="w-14 h-14 bg-[#0b0e1a] border border-[#1e2745] rounded-2xl flex items-center justify-center text-emerald-500 font-bold text-xl group-hover:border-emerald-500/40 transition-all font-bold">
                                             {owner.name ? owner.name[0].toUpperCase() : 'U'}
                                         </div>
-                                        <div className="flex space-x-1">
+                                        <div className="flex gap-2">
                                             <button
                                                 onClick={() => handleEdit(owner)}
-                                                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                                title="Edit Details"
+                                                className="p-2 bg-[#0b0e1a] text-[#6b7db3] border border-[#1e2745] rounded-lg hover:border-blue-500 hover:text-white transition-all shadow-lg"
                                             >
-                                                <Edit2 size={18} />
+                                                <Edit2 size={12} />
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(owner.id)}
-                                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                title="Delete Record"
+                                                className="p-2 bg-[#0b0e1a] text-rose-500/70 border border-[#1e2745] rounded-lg hover:border-rose-500 hover:text-white transition-all shadow-lg"
                                             >
-                                                <Trash2 size={18} />
+                                                <Trash2 size={12} />
                                             </button>
                                         </div>
                                     </div>
-                                    <h3 className="text-xl font-bold text-slate-800 mb-1 truncate">{owner.name}</h3>
 
-                                    <div className="space-y-3 pt-4 border-t border-slate-100 text-sm">
-                                        <div className="flex items-center text-slate-600">
-                                            <Phone size={16} className="text-slate-400 mr-3 flex-shrink-0" />
-                                            <span className="truncate">{owner.phone || 'N/A'}</span>
-                                        </div>
-                                        <div className="flex items-center text-slate-600">
-                                            <Mail size={16} className="text-slate-400 mr-3 flex-shrink-0" />
-                                            <span className="truncate">{owner.email || 'N/A'}</span>
-                                        </div>
-                                        <div className="flex items-start text-slate-600">
-                                            <MapPin size={16} className="text-slate-400 mr-3 mt-0.5 flex-shrink-0" />
-                                            <span className="line-clamp-2">{owner.address || 'N/A'}</span>
-                                        </div>
-                                        {owner.aadharCard && (
-                                            <div className="flex items-center text-slate-500 bg-slate-50 px-3 py-2 rounded-lg mt-3">
-                                                <CreditCard size={14} className="mr-2 text-slate-400" />
-                                                <span className="font-mono text-xs tracking-wide">ID: {owner.aadharCard}</span>
+                                    <h3 className="text-xl font-bold text-white font-bold tracking-wider group-hover:text-emerald-400 transition-colors uppercase truncate">
+                                        {owner.name}
+                                    </h3>
+
+                                    <div className="mt-8 space-y-4 pt-6 border-t border-[#1e2745] flex-1">
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-2 bg-[#0b0e1a] rounded-lg text-[#2a3660] group-hover:text-emerald-500 transition-colors">
+                                                <Phone size={14} />
                                             </div>
-                                        )}
+                                            <span className="text-[10px] text-white font-bold tracking-wider">{owner.phone || 'NO DATA'}</span>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-2 bg-[#0b0e1a] rounded-lg text-[#2a3660] group-hover:text-emerald-500 transition-colors">
+                                                <Mail size={14} />
+                                            </div>
+                                            <span className="text-[10px] text-white font-bold tracking-wider truncate">{owner.email || 'NO EMAIL'}</span>
+                                        </div>
+                                        <div className="flex items-start gap-4">
+                                            <div className="p-2 bg-[#0b0e1a] rounded-lg text-[#2a3660] group-hover:text-emerald-500 transition-colors shrink-0">
+                                                <MapPin size={14} />
+                                            </div>
+                                            <span className="text-[10px] text-[#6b7db3] font-bold uppercase tracking-wider line-clamp-2 mt-2 leading-relaxed">{owner.address || 'NO ADDRESS'}</span>
+                                        </div>
                                     </div>
+
+                                    {owner.aadharCard && (
+                                        <div className="mt-6 p-4 bg-[#0b0e1a] border border-[#1e2745] rounded-2xl flex items-center gap-3">
+                                            <CreditCard size={14} className="text-[#2a3660]" />
+                                            <div className="flex flex-col">
+                                                <span className="text-[8px] text-[#2a3660]  uppercase tracking-[2px]">Aadhar Card</span>
+                                                <span className="text-[10px] text-emerald-400 font-bold tracking-widest">{owner.aadharCard}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <button
+                                        onClick={() => handleEdit(owner)}
+                                        className="mt-6 w-full py-3 bg-[#0b0e1a] border border-[#1e2745] rounded-xl text-[9px] font-bold text-[#6b7db3] uppercase tracking-[3px] group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-600 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        VIEW PROFILE <ArrowUpRight size={12} />
+                                    </button>
                                 </div>
                             </div>
                         ))}
 
                         {filteredOwners.length === 0 && (
-                            <div className="col-span-full py-20 text-center text-slate-500 bg-white rounded-2xl border border-dashed border-slate-300">
-                                <Users size={48} className="mx-auto mb-4 text-slate-300" />
-                                <p className="text-lg">No owners found matching your search.</p>
+                            <div className="col-span-full py-20 text-center bg-[#111629] border border-dashed border-[#1e2745] rounded-3xl">
+                                <Users size={48} className="mx-auto mb-4 text-[#2a3660]" />
+                                <p className="text-[#6b7db3] font-bold uppercase tracking-[3px] text-xs">No owners found</p>
                             </div>
                         )}
                     </div>
-                </div>
+                </>
             )}
 
-            {/* Form Flip View */}
+            {/* Principal Forge (Forms) */}
             {showForm && (
-                <div className="absolute inset-0 z-50 bg-white animate-flipUp min-h-screen overflow-y-auto">
-                    {isAddModalOpen && (
-                        <AddOwnerForm
-                            onAdd={() => {
-                                setIsAddModalOpen(false);
-                            }}
-                            onCancel={() => setIsAddModalOpen(false)}
-                            employees={employees}
-                            isManager={currentUser?.role === 'manager' || currentUser?.role === 'super-admin'}
-                        />
-                    )}
+                <div className="fixed inset-0 z-50 bg-[#0b0e1a] animate-in slide-in-from-bottom duration-500 overflow-y-auto custom-scrollbar">
+                    <div className="min-h-screen p-4 md:p-10">
+                        <div className="max-w-[1400px] mx-auto">
+                            {isAddModalOpen && (
+                                <AddOwnerForm
+                                    onAdd={() => {
+                                        setIsAddModalOpen(false);
+                                        addToast('Owner added successfully', 'success');
+                                    }}
+                                    onCancel={() => setIsAddModalOpen(false)}
+                                    employees={employees}
+                                    isManager={currentUser?.role === 'manager' || currentUser?.role === 'super-admin'}
+                                />
+                            )}
 
-                    {editingOwner && (
-                        <EditOwnerForm
-                            owner={editingOwner}
-                            onUpdate={() => {
-                                setEditingOwner(null);
-                            }}
-                            onCancel={() => setEditingOwner(null)}
-                            employees={employees}
-                            isManager={currentUser?.role === 'manager' || currentUser?.role === 'super-admin'}
-                        />
-                    )}
+                            {editingOwner && (
+                                <EditOwnerForm
+                                    owner={editingOwner}
+                                    onUpdate={() => {
+                                        setEditingOwner(null);
+                                        addToast('Owner details updated', 'success');
+                                    }}
+                                    onCancel={() => setEditingOwner(null)}
+                                    employees={employees}
+                                    isManager={currentUser?.role === 'manager' || currentUser?.role === 'super-admin'}
+                                />
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
     );
 };
 
-export default OwnerList;
+export default ManagerOwners;
 

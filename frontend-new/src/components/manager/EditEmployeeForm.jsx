@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useToast } from '../../contexts/ToastContext';
-import { X, User, Mail, Shield, Trash2, Check, Loader2 } from 'lucide-react';
+import { X, User, Mail, Shield, Trash2, Check, Loader2, ShieldCheck, UserCheck } from 'lucide-react';
 
 const EditEmployeeForm = ({ employee, onUpdate, onCancel, onDelete }) => {
     const [name, setName] = useState(employee.name);
@@ -22,127 +22,127 @@ const EditEmployeeForm = ({ employee, onUpdate, onCancel, onDelete }) => {
                 role,
                 updatedAt: serverTimestamp()
             });
-            addToast('Employee updated successfully', 'success');
+            addToast('Personnel credentials updated', 'success');
             onUpdate();
         } catch (error) {
             console.error(error);
-            addToast('Error updating employee', 'error');
+            addToast('Credential update failure', 'error');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fadeIn">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all animate-scaleUp">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[#0b0e1a]/95 backdrop-blur-xl animate-in fade-in duration-300">
+            <div className="bg-[#111629] border border-[#1e2745] w-full max-w-lg rounded-[32px] overflow-hidden shadow-[0_0_100px_rgba(59,130,246,0.15)] animate-in zoom-in duration-300">
                 <div className="relative p-8">
                     {/* Close Button */}
                     <button
                         onClick={onCancel}
-                        className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
+                        className="absolute top-8 right-8 p-3 bg-[#0b0e1a] text-[#6b7db3] hover:text-white rounded-xl border border-[#1e2745] hover:border-indigo-500 transition-all shadow-lg"
                     >
-                        <X size={20} />
+                        <X size={18} />
                     </button>
 
-                    <div className="mb-8">
-                        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4 bg-indigo-50 text-indigo-600 shadow-sm border border-indigo-100">
-                            <User size={28} />
+                    <div className="mb-10">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-[20px] mb-6 bg-[#0b0e1a] text-indigo-500 border border-[#1e2745] shadow-[0_0_20px_rgba(79,70,229,0.1)]">
+                            <UserCheck size={32} />
                         </div>
-                        <h2 className="text-2xl font-bold text-slate-900">Edit User Account</h2>
-                        <p className="text-slate-500 mt-1">Update profile details and administrative roles.</p>
+                        <h2 className="text-2xl font-bold text-white font-bold tracking-widest uppercase">Credential Management</h2>
+                        <p className="text-[#6b7db3] text-[10px]  uppercase tracking-[3px] mt-2">Personnel Metadata & Privilege Matrix</p>
                     </div>
 
-                    <form onSubmit={handleUpdate} className="space-y-6">
-                        <div className="space-y-4">
-                            <div className="group">
-                                <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Full Name</label>
-                                <div className="relative">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                    <form onSubmit={handleUpdate} className="space-y-8">
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px]  text-[#2a3660] uppercase tracking-[2px] ml-1">Assigned Identity</label>
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#2a3660] group-focus-within:text-indigo-500 transition-colors">
                                         <User size={18} />
                                     </div>
                                     <input
                                         type="text"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
-                                        className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium text-slate-800"
-                                        placeholder="Enter full name"
+                                        className="w-full pl-12 pr-4 py-4 bg-[#0b0e1a] border border-[#1e2745] text-white text-xs font-bold rounded-2xl focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-[#2a3660]"
+                                        placeholder="Full Designation"
                                         required
                                     />
                                 </div>
                             </div>
 
-                            <div className="group">
-                                <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Email Address</label>
-                                <div className="relative">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                            <div className="space-y-2">
+                                <label className="text-[10px]  text-[#2a3660] uppercase tracking-[2px] ml-1">Comms Node (Email)</label>
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#2a3660] group-focus-within:text-indigo-500 transition-colors">
                                         <Mail size={18} />
                                     </div>
                                     <input
                                         type="email"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
-                                        className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium text-slate-800"
-                                        placeholder="email@company.com"
+                                        className="w-full pl-12 pr-4 py-4 bg-[#0b0e1a] border border-[#1e2745] text-white text-xs font-bold rounded-2xl focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-[#2a3660]"
+                                        placeholder="node@secure.network"
                                         required
                                     />
                                 </div>
                             </div>
 
-                            <div className="group">
-                                <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Account Role</label>
-                                <div className="relative">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                            <div className="space-y-2">
+                                <label className="text-[10px]  text-[#2a3660] uppercase tracking-[2px] ml-1">Privilege Classification</label>
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#2a3660] group-focus-within:text-indigo-500 transition-colors">
                                         <Shield size={18} />
                                     </div>
                                     <select
                                         value={role}
                                         onChange={(e) => setRole(e.target.value)}
-                                        className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium text-slate-800 appearance-none"
+                                        className="w-full pl-12 pr-4 py-4 bg-[#0b0e1a] border border-[#1e2745] text-white text-xs font-bold rounded-2xl focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all appearance-none cursor-pointer"
                                     >
-                                        <option value="employee">Employee (Standard Access)</option>
-                                        <option value="manager">Manager (Admin Access)</option>
+                                        <option value="employee">Standard Personnel (Standard Access)</option>
+                                        <option value="manager">Lead Principal (Manager Access)</option>
                                     </select>
-                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#2a3660]">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between pt-6 mt-6 border-t border-slate-100">
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pt-8 mt-4 border-t border-[#1e2745]">
                             {onDelete ? (
                                 <button
                                     type="button"
                                     onClick={onDelete}
-                                    className="flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-xl font-bold transition-all border border-transparent hover:border-red-100 group"
+                                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 text-rose-500/70 hover:bg-rose-500 hover:text-white rounded-xl text-[10px]  uppercase tracking-[2px] transition-all border border-rose-500/20 group"
                                 >
-                                    <Trash2 size={18} className="group-hover:scale-110 transition-transform" />
-                                    <span>Delete</span>
+                                    <Trash2 size={16} className="group-hover:scale-110 transition-transform" />
+                                    <span>Sever Connection</span>
                                 </button>
                             ) : <div></div>}
 
-                            <div className="flex gap-3">
+                            <div className="flex gap-4 w-full sm:w-auto">
                                 <button
                                     type="button"
                                     onClick={onCancel}
-                                    className="px-6 py-2.5 text-slate-600 hover:bg-slate-50 rounded-xl font-bold transition-all"
+                                    className="flex-1 sm:flex-none px-8 py-3 bg-[#0b0e1a] text-[#6b7db3] hover:text-white rounded-xl text-[10px]  uppercase tracking-[2px] transition-all border border-[#1e2745]"
                                 >
-                                    Cancel
+                                    Abort
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="flex items-center gap-2 px-8 py-2.5 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-10 py-3 bg-indigo-600 text-white text-[10px]  uppercase tracking-[3px] rounded-xl shadow-lg shadow-indigo-900/10 hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-50 transition-all"
                                 >
                                     {loading ? (
                                         <>
-                                            <Loader2 size={18} className="animate-spin" />
-                                            <span>Saving...</span>
+                                            <Loader2 size={16} className="animate-spin" />
+                                            <span>Processing...</span>
                                         </>
                                     ) : (
                                         <>
-                                            <Check size={18} />
-                                            <span>Save Changes</span>
+                                            <ShieldCheck size={16} />
+                                            <span>Commit Changes</span>
                                         </>
                                     )}
                                 </button>

@@ -60,6 +60,25 @@
     body {
         @apply bg-slate-50 text-slate-900 antialiased;
     }
+
+    /* Custom Scrollbar Styles */
+    ::-webkit-scrollbar {
+        width: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        @apply bg-transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        @apply bg-indigo-100 rounded-full border-2 border-slate-50 bg-clip-padding hover:bg-indigo-300 transition-colors;
+    }
+
+    /* For Firefox */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: #e0e7ff transparent;
+    }
 }
 
 /* Smooth scrolling for the whole page */

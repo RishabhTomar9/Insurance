@@ -39,13 +39,19 @@ export const AuthProvider = ({ children }) => {
           });
         }
       } catch (error) {
-        console.error('Core Auth Fetch Error:', error);
-        // Fallback to basic auth state to avoid crash
+        if (error.code === 'permission-denied') {
+          console.error('Core Auth: Permission Denied reading own profile. Check firestore.rules for match /users/{userId}.');
+        } else {
+          console.error('Core Auth Fetch Error:', error);
+        }
+
+        // Fallback to basic auth state to allow the app to boot
         setCurrentUser({
           ...user,
           role: 'employee',
           companyId: null,
-          isErrorState: true
+          isErrorState: true,
+          error: error.message
         });
       }
     } else {

@@ -83,13 +83,13 @@ const SuperAdminLoginPage = () => {
                         <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-600/20">
                             <ShieldCheck className="w-10 h-10 text-white" />
                         </div>
-                        <h1 className="text-4xl font-extrabold text-white font-['Rajdhani'] tracking-[4px]">SHRIVA ADMIN</h1>
+                        <h1 className="text-4xl font-extrabold text-white font-bold tracking-[4px]">SHRIVA ADMIN</h1>
                     </div>
 
                     <div className="space-y-4">
                         <h2 className="text-3xl font-bold text-white leading-tight">
                             Hybrid Security <br />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-blue-400 font-['Rajdhani'] text-5xl font-extrabold tracking-wider">
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-blue-400 font-bold text-5xl font-extrabold tracking-wider">
                                 Management Hub.
                             </span>
                         </h2>
@@ -103,7 +103,7 @@ const SuperAdminLoginPage = () => {
             <div className="flex-1 flex flex-col justify-center items-center p-8 bg-[#0b0e1a]">
                 <div className="w-full max-w-md space-y-8">
                     <div className="text-center space-y-2">
-                        <h2 className="text-3xl font-bold text-white font-['Rajdhani'] tracking-widest uppercase">CORPORATE ACCESS</h2>
+                        <h2 className="text-3xl font-bold text-white font-bold tracking-widest uppercase">CORPORATE ACCESS</h2>
                         <p className="text-[#6b7db3] text-sm uppercase tracking-[2px]">Super Admin Entry Terminal</p>
                     </div>
 

@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../../services/firebase';
-import { X, FileText, Calendar, IndianRupee, Shield, Clock, Plus, Trash2, ChevronDown, ChevronUp, Briefcase, CreditCard, User, Landmark } from 'lucide-react';
+import {
+    X, FileText, Calendar, IndianRupee, Shield, Clock, Plus,
+    Trash2, ChevronDown, ChevronUp, Briefcase, CreditCard,
+    User, Landmark, Check, Loader2
+} from 'lucide-react';
+import CustomDropdown from '../common/CustomDropdown';
 
-const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [], isManager = false }) => {
-    // ... basic data init (no change needed in state init)
+const AddPolicyForm = ({ onComplete, onCancel, cars = [], owners = [], employees = [], isManager = false }) => {
     const [basicData, setBasicData] = useState({
         employeeId: '',
         date: new Date().toISOString().split('T')[0],
@@ -14,7 +18,6 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
         contactPerson: ''
     });
 
-    // Quotation Details
     const [quotationData, setQuotationData] = useState({
         isGiven: false,
         isSent: false,
@@ -28,88 +31,35 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
         toAccount: ''
     });
 
-    // Policy Issues & Payment Analysis
     const [policyData, setPolicyData] = useState({
         policyIssueDate: '',
         insuranceCompany: '',
         policyNumber: '',
-        policyStartDate: new Date().toISOString().split('T')[0],
-        policyEndDate: '', // calculate +1 year
+        policyStartDate: '',
+        policyEndDate: '',
         policyType: 'Comprehensive',
-        finalInsuredAmount: '', // sync with quotation initially
+        finalInsuredAmount: '',
         finalThirdPartyPremium: '',
         finalOdPremium: '',
-        finalPremium: '', // The core 'premiumAmount'
-        policyPaymentMode: 'GI', // Direct Link / GI
-        // differenceAmount is calculated
+        finalPremium: '',
+        policyPaymentMode: 'GI',
     });
 
-    // Entries (Payments DOING)
-    const [paymentsOut, setPaymentsOut] = useState([
-        { category: 'Payment to Insurance Company', companyName: 'Policy Bazaar', amount: '', date: new Date().toISOString().split('T')[0], paymentLinkType: 'GI', paymentMode: 'Bank', accountNumber: '' }
-    ]);
-
-    // Receipts (Payments RECEIVING)
-    const [receiptsIn, setReceiptsIn] = useState([
-        { fromType: 'Owner', amount: '', date: new Date().toISOString().split('T')[0], paymentMode: 'Cash', bankAccountType: '', bankAccountNumber: '', creditDetails: 'Nil' }
-    ]);
+    const [paymentsOut, setPaymentsOut] = useState([{ category: 'Payment to Insurance Company', companyName: '', amount: '', date: new Date().toISOString().split('T')[0], paymentLinkType: 'GI', paymentMode: 'Bank', accountNumber: '' }]);
+    const [receiptsIn, setReceiptsIn] = useState([{ fromType: 'Owner', amount: '', date: new Date().toISOString().split('T')[0], paymentMode: 'Cash', bankAccountType: '', bankAccountNumber: '', creditDetails: 'Nil' }]);
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [showQuotation, setShowQuotation] = useState(true);
 
-    // Effects
-    useEffect(() => {
-        if (basicData.carId) {
-            // Note: In Firebase migration, we should check both id and _id for compatibility
-            const car = cars.find(c => (c.id || c._id) === basicData.carId);
-            if (car) {
-                if (car.agentDetails) {
-                    setBasicData(prev => ({
-                        ...prev,
-                        agentName: car.agentDetails.name || prev.agentName
-                    }));
-                }
-            }
-        }
-    }, [basicData.carId, cars]);
-
-    // Sync Quotation values to Policy values if policy values are empty
-    useEffect(() => {
-        if (quotationData.netPremium && !policyData.finalPremium) {
-            setPolicyData(prev => ({ ...prev, finalPremium: quotationData.netPremium }));
-        }
-        if (quotationData.insuredAmount && !policyData.finalInsuredAmount) {
-            setPolicyData(prev => ({ ...prev, finalInsuredAmount: quotationData.insuredAmount }));
-        }
-    }, [quotationData.netPremium, quotationData.insuredAmount]);
-
-    // Calculate End Date
-    useEffect(() => {
-        if (policyData.policyStartDate) {
-            const date = new Date(policyData.policyStartDate);
-            date.setFullYear(date.getFullYear() + 1);
-            date.setDate(date.getDate() - 1);
-            setPolicyData(prev => ({ ...prev, policyEndDate: date.toISOString().split('T')[0] }));
-        }
-    }, [policyData.policyStartDate]);
-
-    // Handlers
     const handleBasicChange = (e) => setBasicData({ ...basicData, [e.target.name]: e.target.value });
     const handleQuotationChange = (e) => setQuotationData({ ...quotationData, [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
     const handlePolicyChange = (e) => setPolicyData({ ...policyData, [e.target.name]: e.target.value });
 
-    // Dynamic List Handlers
-    const addPaymentOut = () => {
-        setPaymentsOut([...paymentsOut, { category: 'Payment to Insurance Company', companyName: '', amount: '', date: new Date().toISOString().split('T')[0], paymentLinkType: 'GI', paymentMode: 'Bank', accountNumber: '' }]);
-    };
     const updatePaymentOut = (index, field, value) => {
         const newPayments = [...paymentsOut];
         newPayments[index][field] = value;
         setPaymentsOut(newPayments);
-    };
-    const removePaymentOut = (index) => {
-        setPaymentsOut(paymentsOut.filter((_, i) => i !== index));
     };
 
     const addReceiptIn = () => {
@@ -120,18 +70,13 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
         newReceipts[index][field] = value;
         setReceiptsIn(newReceipts);
     };
-    const removeReceiptIn = (index) => {
-        setReceiptsIn(receiptsIn.filter((_, i) => i !== index));
-    };
 
-    // Calculate Difference
     const calculateDifference = () => {
         const premium = parseFloat(policyData.finalPremium || quotationData.netPremium || 0);
         const actual = parseFloat(quotationData.actualPaymentAmount || 0);
         return (premium - actual).toFixed(2);
     };
 
-    // Submit
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -141,22 +86,14 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
             const user = auth.currentUser;
             if (!user) throw new Error('Not authenticated');
 
-            // Find current user's profile for companyId
-            const userDocSnap = await getDoc(doc(db, 'users', user.uid));
-            const companyId = userDocSnap.exists() ? userDocSnap.data().companyId : null;
+            // Find current user's companyId
+            const userDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', user.uid)));
+            const companyId = !userDoc.empty ? userDoc.docs[0].data().companyId : null;
 
-            if (!companyId) throw new Error('Company ID not found. Please re-login.');
+            if (!companyId) throw new Error('Company ID not found');
 
             const payload = {
-                // Basic
-                employeeId: basicData.employeeId || user.uid,
-                companyId: companyId,
-                carId: basicData.carId,
-                ownerId: basicData.ownerId,
-                agentName: basicData.agentName,
-                contactPerson: basicData.contactPerson,
-
-                // Quotation
+                ...basicData,
                 quotation: {
                     ...quotationData,
                     insuredAmount: parseFloat(quotationData.insuredAmount) || 0,
@@ -165,196 +102,171 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
                     netPremium: parseFloat(quotationData.netPremium) || 0,
                     actualPaymentAmount: parseFloat(quotationData.actualPaymentAmount) || 0
                 },
-
-                // Policy
-                policyIssueDate: policyData.policyIssueDate,
-                insuranceCompany: policyData.insuranceCompany,
-                policyNumber: policyData.policyNumber,
-                policyStartDate: policyData.policyStartDate,
-                policyEndDate: policyData.policyEndDate,
-                policyType: policyData.policyType,
+                ...policyData,
                 premiumAmount: parseFloat(policyData.finalPremium) || 0,
                 finalInsuredAmount: parseFloat(policyData.finalInsuredAmount) || 0,
                 finalThirdPartyPremium: parseFloat(policyData.finalThirdPartyPremium) || 0,
                 finalOdPremium: parseFloat(policyData.finalOdPremium) || 0,
                 finalPremium: parseFloat(policyData.finalPremium) || 0,
-
-                policyPaymentMode: policyData.policyPaymentMode,
-                paymentDifference: parseFloat(calculateDifference()),
-
-                // Lists
+                paymentDifference: parseFloat(calculateDifference()) || 0,
                 paymentsOut: paymentsOut.map(p => ({ ...p, amount: parseFloat(p.amount) || 0 })),
                 receiptsIn: receiptsIn.map(r => ({ ...r, amount: parseFloat(r.amount) || 0 })),
-
-                // Firestore Metadata
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
+                companyId,
+                createdBy: user.uid,
+                createdAt: serverTimestamp()
             };
 
-            // Add to Firestore collection
             await addDoc(collection(db, 'policies'), payload);
-
-            onAdd();
-            if (onClose) onClose();
+            onComplete();
         } catch (error) {
             console.error(error);
-            setError(error.message || 'Error creating policy record.');
+            setError(error.message || 'Error saving policy record.');
         } finally {
             setLoading(false);
         }
     };
 
-
     return (
-        <div className="bg-white w-full h-full min-h-screen overflow-y-auto">
+        <div className="bg-slate-50 w-full h-full min-h-screen overflow-y-auto font-['DM Sans']">
             <div className="max-w-5xl mx-auto px-6 py-12">
-
                 {/* Header */}
-                <div className="flex justify-between items-center mb-8 pb-6 border-b border-slate-100">
-                    <div>
-                        <h2 className="text-3xl font-bold text-slate-800 tracking-tight flex items-center">
-                            <span className="bg-indigo-100 text-indigo-600 p-3 rounded-xl mr-4 shadow-sm">
-                                <FileText size={28} />
-                            </span>
-                            New Policy Entry
-                        </h2>
-                        <p className="text-slate-500 mt-2 ml-[84px] text-lg">Record quotation, policy issuance, and ledger.</p>
+                <div className="flex justify-between items-center mb-10 pb-6 border-b border-slate-200">
+                    <div className="flex items-center">
+                        <div className="bg-indigo-600/10 text-indigo-600 p-4 rounded-2xl mr-6 border border-indigo-600/20 shadow-lg shadow-indigo-600/5">
+                            <Plus size={32} />
+                        </div>
+                        <div>
+                            <h2 className="text-3xl font-bold text-slate-900 tracking-tight">New Policy Entry</h2>
+                            <p className="text-slate-500 mt-1 text-lg uppercase tracking-[2px]">Log quotation, issuance, and ledger entries.</p>
+                        </div>
                     </div>
-                    {onClose && (
-                        <button onClick={onClose} className="bg-slate-50 text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-3 rounded-full transition-all border border-slate-100 hover:shadow-md">
-                            <X size={28} />
+                    {onCancel && (
+                        <button onClick={onCancel} className="bg-white text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 p-3 rounded-xl transition-all border border-slate-200 hover:border-indigo-600/50 hover:shadow-lg group shadow-xl">
+                            <X size={28} className="group-hover:rotate-90 transition-transform duration-300" />
                         </button>
                     )}
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-8 pb-20">
-
-                    {/* 1. Basic Information */}
-                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                        <div className="mb-6 flex items-center justify-between border-b border-slate-200 pb-4">
-                            <h3 className="text-xl font-bold text-slate-800 flex items-center">
-                                <span className="w-1.5 h-8 bg-indigo-600 rounded-full mr-3"></span>
-                                Basic Details
+                    {/* 1. Main Details */}
+                    <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50">
+                        <div className="mb-8 flex items-center justify-between border-b border-slate-100 pb-5">
+                            <h3 className="text-xl font-bold text-slate-900 flex items-center">
+                                <span className="w-1.5 h-8 bg-indigo-600 rounded-full mr-3 shadow-lg shadow-indigo-600/20"></span>
+                                Main Details
                             </h3>
-                            <span className="text-sm text-slate-500">Entry Date: {new Date().toLocaleDateString()}</span>
+                            <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">Entry Date: {new Date().toLocaleDateString()}</span>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {/* Manager Selection */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             {isManager && (
-                                <div className="group">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Employee</label>
-                                    <select
-                                        name="employeeId"
-                                        value={basicData.employeeId}
-                                        onChange={handleBasicChange}
-                                        className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    >
-                                        <option value="">-- Assign to Me --</option>
-                                        {employees.map(e => <option key={e.id || e.uid} value={e.id || e.uid}>{e.email}</option>)}
-                                    </select>
-                                </div>
+                                <CustomDropdown
+                                    label="Employee"
+                                    options={[{ id: '', label: '-- Myself --' }, ...employees.map(e => ({ id: e.id || e.uid, label: e.email }))]}
+                                    value={basicData.employeeId}
+                                    onChange={(val) => setBasicData({ ...basicData, employeeId: val })}
+                                    searchable={true}
+                                />
                             )}
+                            <CustomDropdown
+                                label="Vehicle *"
+                                options={cars.map(c => ({ id: c.id, label: `${c.vehicleNumber} (${c.make})` }))}
+                                value={basicData.carId}
+                                onChange={(val) => setBasicData({ ...basicData, carId: val })}
+                                searchable={true}
+                                placeholder="-- Choose Vehicle --"
+                            />
+                            <CustomDropdown
+                                label="Owner *"
+                                options={owners.map(o => ({ id: o.id, label: o.name }))}
+                                value={basicData.ownerId}
+                                onChange={(val) => setBasicData({ ...basicData, ownerId: val })}
+                                searchable={true}
+                                placeholder="-- Choose Owner --"
+                            />
                             <div className="group">
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Vehicle *</label>
-                                <select
-                                    name="carId" required value={basicData.carId} onChange={handleBasicChange}
-                                    className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                >
-                                    <option value="">-- Select Vehicle --</option>
-                                    {cars.map(c => <option key={c.id} value={c.id}>{c.vehicleNumber} ({c.make})</option>)}
-                                </select>
-                            </div>
-                            <div className="group">
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Owner *</label>
-                                <select
-                                    name="ownerId" required value={basicData.ownerId} onChange={handleBasicChange}
-                                    className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                >
-                                    <option value="">-- Select Owner --</option>
-                                    {owners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-                                </select>
-                            </div>
-                            <div className="group">
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Agent Name</label>
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 group-focus-within:text-indigo-600 transition-colors tracking-[1px] ml-1">Ref (Agent)</label>
                                 <input
-                                    name="agentName" value={basicData.agentName} onChange={handleBasicChange} placeholder="Agent / Owner"
-                                    className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    name="agentName" value={basicData.agentName} onChange={handleBasicChange} placeholder="e.g. Self"
+                                    className="w-full p-3 bg-slate-50 border border-slate-200 text-slate-900 rounded-xl focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none font-bold placeholder:text-slate-300"
                                 />
                             </div>
                             <div className="group">
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Contact Person</label>
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 group-focus-within:text-indigo-600 transition-colors tracking-[1px] ml-1">Contact Person</label>
                                 <input
-                                    name="contactPerson" value={basicData.contactPerson} onChange={handleBasicChange} placeholder="Contact Person Name"
-                                    className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    name="contactPerson" value={basicData.contactPerson} onChange={handleBasicChange} placeholder="Name"
+                                    className="w-full p-3 bg-slate-50 border border-slate-200 text-slate-900 rounded-xl focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none font-bold placeholder:text-slate-300"
                                 />
                             </div>
                         </div>
                     </div>
 
-                    {/* 2. Quotation Details */}
-                    <div className={`rounded-2xl border transition-all duration-300 ${showQuotation ? 'bg-slate-50 border-slate-300 shadow-sm' : 'bg-white border-slate-200'}`}>
-                        <div className="p-6 cursor-pointer flex justify-between items-center" onClick={() => setShowQuotation(!showQuotation)}>
-                            <h3 className="text-xl font-bold text-slate-800 flex items-center">
-                                <span className={`w-1.5 h-8 rounded-full mr-3 ${showQuotation ? 'bg-blue-600' : 'bg-slate-200'}`}></span>
-                                Quotation Details
+                    {/* 2. Price & Details */}
+                    <div className={`rounded-[32px] border transition-all duration-500 shadow-2xl ${showQuotation ? 'bg-indigo-600/5 border-indigo-600/20' : 'bg-white border-slate-200'}`}>
+                        <div className="p-8 cursor-pointer flex justify-between items-center" onClick={() => setShowQuotation(!showQuotation)}>
+                            <h3 className="text-xl font-bold text-slate-900 flex items-center">
+                                <span className={`w-1.5 h-8 rounded-full mr-3 transition-colors ${showQuotation ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20' : 'bg-slate-200'}`}></span>
+                                Price & Details
                             </h3>
-                            {showQuotation ? <ChevronUp className="text-blue-600" /> : <ChevronDown className="text-slate-400" />}
+                            {showQuotation ? <ChevronUp className="text-indigo-600" /> : <ChevronDown className="text-slate-400" />}
                         </div>
 
                         {showQuotation && (
-                            <div className="px-6 pb-6 animate-fadeIn">
-                                <div className="flex items-center space-x-6 mb-6 bg-white p-4 rounded-xl border border-slate-200">
-                                    <label className="flex items-center space-x-2 cursor-pointer">
-                                        <input type="checkbox" name="isGiven" checked={quotationData.isGiven} onChange={handleQuotationChange} className="w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" />
-                                        <span className="text-sm font-semibold text-slate-700">Quotation Created</span>
+                            <div className="px-8 pb-8 animate-fadeIn">
+                                <div className="flex items-center gap-6 mb-8 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                                    <label className="flex items-center space-x-3 cursor-pointer group">
+                                        <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${quotationData.isGiven ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-transparent border-slate-200 group-hover:border-indigo-500'}`}>
+                                            <input type="checkbox" name="isGiven" checked={quotationData.isGiven} onChange={handleQuotationChange} className="hidden" />
+                                            {quotationData.isGiven && <Check size={16} strokeWidth={4} />}
+                                        </div>
+                                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest group-hover:text-indigo-600 transition-colors">Price Sent</span>
                                     </label>
-                                    <label className="flex items-center space-x-2 cursor-pointer">
-                                        <input type="checkbox" name="isSent" checked={quotationData.isSent} onChange={handleQuotationChange} className="w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" />
-                                        <span className="text-sm font-semibold text-slate-700">Sent to Customer</span>
+                                    <label className="flex items-center space-x-3 cursor-pointer group">
+                                        <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${quotationData.isSent ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-transparent border-slate-200 group-hover:border-emerald-500'}`}>
+                                            <input type="checkbox" name="isSent" checked={quotationData.isSent} onChange={handleQuotationChange} className="hidden" />
+                                            {quotationData.isSent && <Check size={16} strokeWidth={4} />}
+                                        </div>
+                                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest group-hover:text-emerald-600 transition-colors">Confirmed</span>
                                     </label>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                                     <div className="group">
-                                        <label className="block text-xs font-medium text-slate-500 mb-1">Insured Amount (IDV)</label>
-                                        <input type="number" name="insuredAmount" value={quotationData.insuredAmount} onChange={handleQuotationChange} className="w-full p-2 bg-white border border-slate-300 rounded text-sm font-mono" placeholder="0.00" />
+                                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-[1px] ml-1">IDV Amount</label>
+                                        <input type="number" name="insuredAmount" value={quotationData.insuredAmount} onChange={handleQuotationChange} className="w-full p-3 bg-white border border-slate-200 text-slate-900 rounded-xl focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none font-bold placeholder:text-slate-300" placeholder="0.00" />
                                     </div>
                                     <div className="group">
-                                        <label className="block text-xs font-medium text-slate-500 mb-1">Third Party Premium</label>
-                                        <input type="number" name="thirdPartyPremium" value={quotationData.thirdPartyPremium} onChange={handleQuotationChange} className="w-full p-2 bg-white border border-slate-300 rounded text-sm font-mono" placeholder="0.00" />
+                                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-[1px] ml-1">TP Premium</label>
+                                        <input type="number" name="thirdPartyPremium" value={quotationData.thirdPartyPremium} onChange={handleQuotationChange} className="w-full p-3 bg-white border border-slate-200 text-slate-900 rounded-xl focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none font-bold placeholder:text-slate-300" placeholder="0.00" />
                                     </div>
                                     <div className="group">
-                                        <label className="block text-xs font-medium text-slate-500 mb-1">Own Damage (OD)</label>
-                                        <input type="number" name="odPremium" value={quotationData.odPremium} onChange={handleQuotationChange} className="w-full p-2 bg-white border border-slate-300 rounded text-sm font-mono" placeholder="0.00" />
+                                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-[1px] ml-1">OD Premium</label>
+                                        <input type="number" name="odPremium" value={quotationData.odPremium} onChange={handleQuotationChange} className="w-full p-3 bg-white border border-slate-200 text-slate-900 rounded-xl focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none font-bold placeholder:text-slate-300" placeholder="0.00" />
                                     </div>
                                     <div className="group">
-                                        <label className="block text-xs font-medium text-slate-500 mb-1">Net Premium</label>
-                                        <input type="number" name="netPremium" value={quotationData.netPremium} onChange={handleQuotationChange} className="w-full p-2 border border-slate-300 rounded text-sm font-mono font-bold text-indigo-700 bg-indigo-50" placeholder="0.00" />
+                                        <label className="block text-[10px] font-bold text-indigo-600 mb-2 uppercase tracking-[1px] ml-1">Total Price</label>
+                                        <input type="number" name="netPremium" value={quotationData.netPremium} onChange={handleQuotationChange} className="w-full p-3 bg-indigo-600/10 border border-indigo-600/30 text-indigo-600 rounded-xl focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none font-bold placeholder:text-indigo-400" placeholder="0.00" />
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-200">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-8 border-t border-slate-100 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
                                     <div className="group">
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">Actual Payment Amount</label>
+                                        <label className="block text-[10px] font-bold text-slate-900 mb-2 uppercase tracking-[1px] ml-1">Collected Amt</label>
                                         <div className="relative">
-                                            <IndianRupee size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                            <input type="number" name="actualPaymentAmount" value={quotationData.actualPaymentAmount} onChange={handleQuotationChange} className="w-full p-2 pl-9 bg-white border border-slate-300 rounded-md shadow-sm outline-none focus:border-indigo-500" placeholder="0.00" />
+                                            <IndianRupee size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input type="number" name="actualPaymentAmount" value={quotationData.actualPaymentAmount} onChange={handleQuotationChange} className="w-full p-3 pl-12 bg-slate-50 border border-slate-200 text-slate-900 rounded-xl focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none font-bold placeholder:text-slate-300" placeholder="0.00" />
                                         </div>
                                     </div>
+                                    <CustomDropdown
+                                        label="Mode"
+                                        options={['Collection Gateway', 'Payment Gateway', 'Cash', 'Direct Transfer'].map(m => ({ value: m, label: m }))}
+                                        value={quotationData.paymentGateway}
+                                        onChange={(val) => setQuotationData({ ...quotationData, paymentGateway: val })}
+                                    />
                                     <div className="group">
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">Gateway / Mode</label>
-                                        <select name="paymentGateway" value={quotationData.paymentGateway} onChange={handleQuotationChange} className="w-full p-2 bg-white border border-slate-300 rounded-md shadow-sm text-sm">
-                                            <option>Collection Gateway</option>
-                                            <option>Payment Gateway</option>
-                                            <option>Cash</option>
-                                            <option>Direct Transfer</option>
-                                        </select>
-                                    </div>
-                                    <div className="group">
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">Transaction Route</label>
-                                        <div className="flex space-x-2">
-                                            <input name="fromAccount" value={quotationData.fromAccount} onChange={handleQuotationChange} className="w-1/2 p-2 bg-white border text-xs border-slate-300 rounded" placeholder="From Acc No." />
-                                            <input name="toAccount" value={quotationData.toAccount} onChange={handleQuotationChange} className="w-1/2 p-2 bg-white border text-xs border-slate-300 rounded" placeholder="To Acc No." />
+                                        <label className="block text-[10px] font-bold text-slate-900 mb-2 uppercase tracking-[1px] ml-1">Account Tracking</label>
+                                        <div className="flex gap-3">
+                                            <input name="fromAccount" value={quotationData.fromAccount} onChange={handleQuotationChange} className="w-1/2 p-3 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl font-bold placeholder:text-slate-300" placeholder="From" />
+                                            <input name="toAccount" value={quotationData.toAccount} onChange={handleQuotationChange} className="w-1/2 p-3 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl font-bold placeholder:text-slate-300" placeholder="To" />
                                         </div>
                                     </div>
                                 </div>
@@ -362,82 +274,73 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
                         )}
                     </div>
 
-                    {/* 3. Policy Issue & Payment Analysis */}
+                    {/* 3. Policy Details */}
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                        {/* Policy Info */}
-                        <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6 h-full">
-                            <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
-                                <span className="w-1.5 h-8 bg-emerald-600 rounded-full mr-3"></span>
-                                Final Policy Issue
+                        <div className="bg-white rounded-[32px] border border-slate-200 p-8 h-full shadow-2xl">
+                            <h3 className="text-xl font-bold text-slate-900 mb-8 flex items-center">
+                                <span className="w-1.5 h-8 bg-emerald-500 rounded-full mr-3 shadow-lg shadow-emerald-500/20"></span>
+                                Last Details
                             </h3>
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-1">Policy Number</label>
-                                        <input name="policyNumber" value={policyData.policyNumber} onChange={handlePolicyChange} className="w-full p-2 bg-white border border-slate-300 rounded text-sm uppercase" placeholder="POLICY-NO-XXX" />
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="group">
+                                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-[1px] ml-1">Policy No.</label>
+                                        <input name="policyNumber" value={policyData.policyNumber} onChange={handlePolicyChange} className="w-full p-3 bg-slate-50 border border-slate-200 text-slate-900 rounded-xl focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none font-bold uppercase placeholder:text-slate-300" placeholder="XXX-XXX" />
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-1">Insurance Company</label>
-                                        <select name="insuranceCompany" value={policyData.insuranceCompany} onChange={handlePolicyChange} className="w-full p-2 bg-white border border-slate-300 rounded text-sm">
-                                            <option value="">-- Select --</option>
-                                            <option>Policy Bazaar</option>
-                                            <option>Digit</option>
-                                            <option>Acko</option>
-                                            <option>HDFC Ergo</option>
-                                            <option>ICICI Lombard</option>
-                                        </select>
-                                    </div>
+                                    <CustomDropdown
+                                        label="Company"
+                                        options={['Policy Bazaar', 'Digit', 'Acko', 'HDFC Ergo', 'ICICI Lombard'].map(c => ({ value: c, label: c }))}
+                                        value={policyData.insuranceCompany}
+                                        onChange={(val) => setPolicyData({ ...policyData, insuranceCompany: val })}
+                                        searchable={true}
+                                    />
                                 </div>
-                                <div className="grid grid-cols-3 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-1">IDV</label>
-                                        <input type="number" name="finalInsuredAmount" value={policyData.finalInsuredAmount} onChange={handlePolicyChange} className="w-full p-2 bg-white border border-slate-300 rounded text-sm" placeholder="IDV" />
+                                <div className="grid grid-cols-3 gap-6">
+                                    <div className="group">
+                                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-[1px] ml-1">IDV</label>
+                                        <input type="number" name="finalInsuredAmount" value={policyData.finalInsuredAmount} onChange={handlePolicyChange} className="w-full p-3 bg-slate-50 border border-slate-200 text-slate-900 rounded-xl focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none font-bold" />
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-1">Final Premium *</label>
-                                        <input type="number" name="finalPremium" required value={policyData.finalPremium} onChange={handlePolicyChange} className="w-full p-2 border border-slate-300 rounded text-sm font-bold bg-emerald-50 text-emerald-700" placeholder="Amt" />
+                                    <div className="group">
+                                        <label className="block text-[10px] font-bold text-emerald-600 mb-2 uppercase tracking-[1px] ml-1">Final Bill *</label>
+                                        <input type="number" name="finalPremium" required value={policyData.finalPremium} onChange={handlePolicyChange} className="w-full p-3 bg-emerald-50 border border-emerald-500/20 text-emerald-600 rounded-xl focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-500 outline-none font-bold" />
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-500 mb-1">Start Date</label>
-                                        <input type="date" name="policyStartDate" value={policyData.policyStartDate} onChange={handlePolicyChange} className="w-full p-2 bg-white border border-slate-300 rounded text-sm" />
+                                    <div className="group">
+                                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-[1px] ml-1">Start Date</label>
+                                        <input type="date" name="policyStartDate" value={policyData.policyStartDate} onChange={handlePolicyChange} className="w-full p-3 bg-slate-50 border border-slate-200 text-slate-900 rounded-xl outline-none" />
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Payment Analysis */}
-                        <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6 flex flex-col justify-center h-full">
-                            <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
-                                <span className="w-1.5 h-8 bg-purple-600 rounded-full mr-3"></span>
-                                Payment Analysis
+                        <div className="bg-white rounded-[32px] border border-slate-200 p-8 flex flex-col justify-center h-full shadow-2xl">
+                            <h3 className="text-xl font-bold text-slate-900 mb-8 flex items-center">
+                                <span className="w-1.5 h-8 bg-purple-500 rounded-full mr-3 shadow-lg shadow-purple-500/20"></span>
+                                Payment Summary
                             </h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-2">Policy Source</label>
-                                    <div className="flex gap-4">
-                                        <label className={`flex-1 p-3 rounded-xl border cursor-pointer transition-all text-center text-sm font-bold ${policyData.policyPaymentMode === 'Direct Link' ? 'bg-purple-100 border-purple-300 text-purple-800' : 'bg-white border-slate-300 text-slate-500'}`}>
-                                            <input type="radio" name="policyPaymentMode" value="Direct Link" checked={policyData.policyPaymentMode === 'Direct Link'} onChange={handlePolicyChange} className="hidden" />
-                                            Direct Link
-                                        </label>
-                                        <label className={`flex-1 p-3 rounded-xl border cursor-pointer transition-all text-center text-sm font-bold ${policyData.policyPaymentMode === 'GI' ? 'bg-purple-100 border-purple-300 text-purple-800' : 'bg-white border-slate-300 text-slate-500'}`}>
-                                            <input type="radio" name="policyPaymentMode" value="GI" checked={policyData.policyPaymentMode === 'GI'} onChange={handlePolicyChange} className="hidden" />
-                                            GI (General Insurance)
-                                        </label>
-                                    </div>
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-2 gap-6">
+                                    <label className={`p-5 rounded-2xl border-2 cursor-pointer transition-all text-center text-[10px] font-bold uppercase tracking-widest ${policyData.policyPaymentMode === 'Direct Link' ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-indigo-200'}`}>
+                                        <input type="radio" name="policyPaymentMode" value="Direct Link" checked={policyData.policyPaymentMode === 'Direct Link'} onChange={handlePolicyChange} className="hidden" />
+                                        Direct Link
+                                    </label>
+                                    <label className={`p-5 rounded-2xl border-2 cursor-pointer transition-all text-center text-[10px] font-bold uppercase tracking-widest ${policyData.policyPaymentMode === 'GI' ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-indigo-200'}`}>
+                                        <input type="radio" name="policyPaymentMode" value="GI" checked={policyData.policyPaymentMode === 'GI'} onChange={handlePolicyChange} className="hidden" />
+                                        GI Route
+                                    </label>
                                 </div>
-                                <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-sm text-slate-500">Insurance Premium</span>
-                                        <span className="font-bold text-slate-800">₹ {policyData.finalPremium || 0}</span>
+                                <div className="p-8 bg-slate-50 rounded-[32px] border border-slate-100 shadow-inner">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <span className="text-xs text-slate-500 uppercase tracking-widest font-bold">Premium Due</span>
+                                        <span className="font-bold text-slate-900">₹ {policyData.finalPremium || 0}</span>
                                     </div>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-sm text-slate-500">Actual Payment</span>
-                                        <span className="font-bold text-slate-800">₹ {quotationData.actualPaymentAmount || 0}</span>
+                                    <div className="flex justify-between items-center mb-4">
+                                        <span className="text-xs text-slate-500 uppercase tracking-widest font-bold">Amt Received</span>
+                                        <span className="font-bold text-slate-900">₹ {quotationData.actualPaymentAmount || 0}</span>
                                     </div>
-                                    <div className="h-px bg-slate-100 my-2"></div>
+                                    <div className="h-px bg-slate-200 my-6 shadow-sm"></div>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-sm font-bold text-slate-700">Difference</span>
-                                        <span className={`text-xl font-bold ${calculateDifference() > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                        <span className="text-sm font-bold text-slate-900 uppercase tracking-widest">Balance</span>
+                                        <span className={`text-3xl font-bold ${calculateDifference() > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
                                             ₹ {calculateDifference()}
                                         </span>
                                     </div>
@@ -446,120 +349,56 @@ const AddPolicyForm = ({ onAdd, onClose, cars = [], owners = [], employees = [],
                         </div>
                     </div>
 
-                    {/* 4. Ledger: Payments Out & Receipts In */}
+                    {/* Ledger (Simplified implementation for creation) */}
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                        {/* Payments Out */}
-                        <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
-                            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-                                <h3 className="text-lg font-bold text-slate-800 flex items-center">
-                                    <CreditCard size={20} className="mr-2 text-red-500" /> Outgoing Payments
-                                </h3>
-                                <button type="button" onClick={addPaymentOut} className="text-xs flex items-center bg-white border border-slate-300 px-3 py-1 rounded-full shadow-sm hover:bg-slate-100">
-                                    <Plus size={14} className="mr-1" /> Add Entry
-                                </button>
-                            </div>
-                            <div className="p-4 space-y-3">
-                                {paymentsOut.map((payment, index) => (
-                                    <div key={index} className="p-4 rounded-xl border border-slate-200 bg-white relative group hover:border-slate-300 transition-colors shadow-sm">
-                                        <button type="button" onClick={() => removePaymentOut(index)} className="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Trash2 size={16} />
-                                        </button>
-                                        <div className="grid grid-cols-2 gap-3 mb-2">
-                                            <select
-                                                value={payment.category}
-                                                onChange={(e) => updatePaymentOut(index, 'category', e.target.value)}
-                                                className="col-span-2 p-2 text-xs font-bold text-indigo-900 bg-indigo-50/50 rounded border-none outline-none"
-                                            >
-                                                <option>Payment to Insurance Company</option>
-                                                <option>Payment to Direct Link</option>
-                                                <option>Commission Payout</option>
-                                            </select>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <input placeholder="Company / Agent Name" value={payment.companyName} onChange={e => updatePaymentOut(index, 'companyName', e.target.value)} className="p-2 text-xs border border-slate-200 rounded bg-slate-50" />
-                                            <input type="number" placeholder="Amount" value={payment.amount} onChange={e => updatePaymentOut(index, 'amount', e.target.value)} className="p-2 text-xs border border-slate-200 rounded bg-slate-50 font-mono" />
-
-                                            <select value={payment.paymentLinkType} onChange={e => updatePaymentOut(index, 'paymentLinkType', e.target.value)} className="p-2 text-xs border border-slate-200 rounded bg-slate-50">
-                                                <option>GI</option>
-                                                <option>Link</option>
-                                            </select>
-                                            <select value={payment.paymentMode} onChange={e => updatePaymentOut(index, 'paymentMode', e.target.value)} className="p-2 text-xs border border-slate-200 rounded bg-slate-50">
-                                                <option>Bank</option>
-                                                <option>CC</option>
-                                                <option>Other</option>
-                                            </select>
-
-                                            <input type="date" value={payment.date} onChange={e => updatePaymentOut(index, 'date', e.target.value)} className="p-2 text-xs border border-slate-200 rounded bg-slate-50" />
-                                            <input placeholder="Acc No / Ref" value={payment.accountNumber} onChange={e => updatePaymentOut(index, 'accountNumber', e.target.value)} className="p-2 text-xs border border-slate-200 rounded bg-slate-50" />
-                                        </div>
-                                    </div>
-                                ))}
+                        <div className="bg-white rounded-[40px] border border-slate-200 overflow-hidden shadow-2xl p-8">
+                            <h3 className="text-lg font-bold text-slate-900 flex items-center mb-6">
+                                <CreditCard size={20} className="mr-3 text-rose-500" /> Outgoing (Payments)
+                            </h3>
+                            <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-4">Default Entry Created</p>
+                            <div className="p-5 rounded-2xl border border-slate-100 bg-slate-50/50">
+                                <span className="text-[10px] font-bold text-rose-500 uppercase">Insurance Premium Flow</span>
                             </div>
                         </div>
-
-                        {/* Receipts In */}
-                        <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
-                            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-                                <h3 className="text-lg font-bold text-slate-800 flex items-center">
-                                    <Landmark size={20} className="mr-2 text-green-600" /> Incoming Receipts
-                                </h3>
-                                <button type="button" onClick={addReceiptIn} className="text-xs flex items-center bg-white border border-slate-300 px-3 py-1 rounded-full shadow-sm hover:bg-slate-100">
-                                    <Plus size={14} className="mr-1" /> Add Receipt
-                                </button>
-                            </div>
-                            <div className="p-4 space-y-3">
-                                {receiptsIn.map((receipt, index) => (
-                                    <div key={index} className="p-4 rounded-xl border border-slate-200 bg-white relative group hover:border-slate-300 transition-colors shadow-sm">
-                                        <button type="button" onClick={() => removeReceiptIn(index)} className="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Trash2 size={16} />
-                                        </button>
-                                        <div className="grid grid-cols-2 gap-3 mb-2">
-                                            <div className="flex items-center space-x-2">
-                                                <span className="text-xs font-bold text-slate-500 uppercase">From:</span>
-                                                <select
-                                                    value={receipt.fromType}
-                                                    onChange={(e) => updateReceiptIn(index, 'fromType', e.target.value)}
-                                                    className="p-1 px-2 text-xs font-bold text-slate-800 bg-slate-100 rounded border border-slate-200"
-                                                >
-                                                    <option>Owner</option>
-                                                    <option>Agent</option>
-                                                </select>
-                                            </div>
-                                            <div className="flex items-center space-x-2">
-                                                <span className="text-xs font-bold text-slate-500 uppercase">Mode:</span>
-                                                <select
-                                                    value={receipt.paymentMode}
-                                                    onChange={(e) => updateReceiptIn(index, 'paymentMode', e.target.value)}
-                                                    className="p-1 px-2 text-xs font-bold text-slate-800 bg-slate-100 rounded border border-slate-200"
-                                                >
-                                                    <option>Cash</option>
-                                                    <option>Credit</option>
-                                                    <option>Bank</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="col-span-2 relative">
-                                                <input type="number" placeholder="Amount Recvd" value={receipt.amount} onChange={e => updateReceiptIn(index, 'amount', e.target.value)} className="w-full p-2 pl-8 text-sm font-bold border rounded bg-slate-50 border-green-200 text-green-800 placeholder-green-300" />
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-green-600">₹</span>
-                                            </div>
-
-                                            <input type="date" value={receipt.date} onChange={e => updateReceiptIn(index, 'date', e.target.value)} className="p-2 text-xs border border-slate-200 rounded bg-slate-50" />
-                                            <input placeholder={receipt.paymentMode === 'Credit' ? 'Credit Note / Nil' : 'Bank / Acc No'} value={receipt.paymentMode === 'Credit' ? receipt.creditDetails : receipt.bankAccountNumber} onChange={e => updateReceiptIn(index, receipt.paymentMode === 'Credit' ? 'creditDetails' : 'bankAccountNumber', e.target.value)} className="p-2 text-xs border border-slate-200 rounded bg-slate-50" />
-                                        </div>
-                                    </div>
-                                ))}
+                        <div className="bg-white rounded-[40px] border border-slate-200 overflow-hidden shadow-2xl p-8">
+                            <h3 className="text-lg font-bold text-slate-900 flex items-center mb-6">
+                                <Landmark size={20} className="mr-3 text-emerald-600" /> Incoming (Receipts)
+                            </h3>
+                            <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-4">Default Entry Created</p>
+                            <div className="p-5 rounded-2xl border border-slate-100 bg-slate-50/50">
+                                <span className="text-[10px] font-bold text-emerald-600 uppercase">Owner Receipt logged</span>
                             </div>
                         </div>
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="pt-6 flex items-center justify-between border-t border-slate-100">
-                        <div className="text-red-500 text-sm font-medium">{error}</div>
-                        <div className="flex space-x-4">
-                            {onClose && <button type="button" onClick={onClose} className="px-6 py-2 bg-white border border-slate-300 rounded-lg text-slate-600 font-bold hover:bg-slate-50 transition-colors">Cancel</button>}
-                            <button type="submit" disabled={loading} className="px-8 py-3 bg-indigo-900 text-white rounded-xl shadow-xl font-bold hover:bg-indigo-800 transform active:scale-95 transition-all flex items-center">
-                                {loading ? 'Saving Entry...' : 'Save Complete Policy Entry'}
+                    <div className="pt-12 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-8">
+                        <div className="flex-1 w-full sm:w-auto text-center sm:text-left">
+                            {error && <p className="text-rose-500 text-xs bg-rose-50 py-3 px-6 rounded-2xl border border-rose-100 font-bold uppercase tracking-widest inline-block">{error}</p>}
+                        </div>
+                        <div className="flex justify-end gap-6 w-full sm:w-auto">
+                            {onCancel && (
+                                <button
+                                    type="button"
+                                    onClick={onCancel}
+                                    className="px-10 py-5 rounded-2xl bg-white text-slate-400 hover:text-slate-700 border border-slate-200 hover:border-slate-300 transition-all font-bold uppercase tracking-widest text-xs shadow-sm active:scale-95"
+                                >
+                                    Cancel
+                                </button>
+                            )}
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="px-12 py-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xl shadow-indigo-600/20 active:scale-95 transition-all font-bold disabled:opacity-50 text-xs uppercase tracking-[3px] flex items-center justify-center gap-3 border border-indigo-500"
+                            >
+                                {loading ? (
+                                    <>
+                                        <Loader2 size={20} className="animate-spin" />
+                                        <span>Saving Policy...</span>
+                                    </>
+                                ) : (
+                                    <span>Create Policy Record</span>
+                                )}
                             </button>
                         </div>
                     </div>

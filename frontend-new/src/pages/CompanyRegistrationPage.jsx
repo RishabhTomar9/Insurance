@@ -56,7 +56,7 @@ const CompanyRegistrationPage = () => {
                     <div className="inline-flex items-center justify-center w-20 h-20 bg-emerald-500/10 rounded-full mb-4">
                         <CheckCircle2 className="w-10 h-10 text-emerald-500" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white font-['Rajdhani'] tracking-wider">REGISTRATION SUCCESSFUL</h2>
+                    <h2 className="text-3xl font-bold text-white font-bold tracking-wider">REGISTRATION SUCCESSFUL</h2>
                     <p className="text-[#6b7db3] text-sm leading-relaxed">
                         We've sent a verification link to <span className="text-white font-medium">{formData.companyEmail}</span>.
                         Please verify your email to initialize your Super Admin account.
@@ -77,7 +77,7 @@ const CompanyRegistrationPage = () => {
             <div className="max-w-4xl mx-auto space-y-8">
                 {/* Header */}
                 <div className="text-center space-y-2">
-                    <h1 className="text-4xl font-extrabold font-['Rajdhani'] tracking-[4px] bg-gradient-to-r from-blue-500 to-emerald-400 bg-clip-text text-transparent uppercase">
+                    <h1 className="text-4xl font-extrabold font-bold tracking-[4px] bg-gradient-to-r from-blue-500 to-emerald-400 bg-clip-text text-transparent uppercase">
                         Shriva-Ins CRM
                     </h1>
                     <p className="text-[#6b7db3] text-sm tracking-[2px] uppercase">Phase 0 · Company Registration</p>
@@ -88,7 +88,7 @@ const CompanyRegistrationPage = () => {
                         {/* Sidebar Info */}
                         <div className="md:col-span-2 bg-[#0d1226] p-10 space-y-8 border-r border-[#1e2745]">
                             <div className="space-y-4">
-                                <h3 className="text-xl font-bold font-['Rajdhani'] text-white">Why Register?</h3>
+                                <h3 className="text-xl font-bold font-bold text-white">Why Register?</h3>
                                 <div className="space-y-6">
                                     {[
                                         { title: 'Unified Management', desc: 'Centralize policies for your entire agency.' },

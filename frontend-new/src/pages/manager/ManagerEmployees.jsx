@@ -1,16 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp, query, where, onSnapshot, deleteDoc, collection } from 'firebase/firestore';
 import { db, auth, firebaseConfig } from '../../services/firebase';
 
 import { useToast } from '../../contexts/ToastContext';
-import { useAuth } from '../../contexts/AuthContext'; // Added useAuth import
+import { useAuth } from '../../contexts/AuthContext';
 import EmployeeList from '../../components/manager/EmployeeList';
+import { UserPlus, ShieldAlert, Cpu, HelpCircle, Mail, User, ShieldCheck, Trash2 } from 'lucide-react';
+
+const AuthorizedManagersList = () => {
+    const [list, setList] = useState([]);
+    const { currentUser } = useAuth();
+    const { addToast } = useToast();
+
+    useEffect(() => {
+        if (!currentUser?.companyId) return;
+        const q = query(collection(db, 'authorized_managers'), where('companyId', '==', currentUser.companyId));
+        return onSnapshot(q, (snap) => {
+            setList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+    }, [currentUser]);
+
+    const removeAuth = async (email) => {
+        try {
+            await deleteDoc(doc(db, 'authorized_managers', email));
+            addToast(`Invite removed for: ${email}`, 'info');
+        } catch (e) {
+            addToast('Error: Could not remove invite', 'error');
+        }
+    };
+
+    if (list.length === 0) return null;
+
+    return (
+        <div className="bg-white border border-slate-100 p-8 rounded-[32px] shadow-xl shadow-slate-200/50">
+            <h4 className="text-[10px] text-slate-400 uppercase tracking-[2px] mb-6 font-bold">Pending Requests</h4>
+            <div className="space-y-4">
+                {list.map(item => (
+                    <div key={item.id} className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl border border-slate-100 group hover:border-indigo-500/20 transition-all">
+                        <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-900 truncate group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{item.email}</p>
+                            <p className="text-[9px] text-slate-400 uppercase mt-1 font-medium tracking-widest">
+                                Sent: {item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : 'Just now'}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => removeAuth(item.id)}
+                            className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
 
 const ManagerEmployees = () => {
-    const { currentUser } = useAuth(); // Moved useAuth call to component level
-    const isSuperAdmin = currentUser?.role === 'super-admin'; // Updated isSuperAdmin definition
+    const { currentUser } = useAuth();
+    const isSuperAdmin = currentUser?.role === 'super-admin';
     const [showInstructions, setShowInstructions] = useState(false);
     const [authEmail, setAuthEmail] = useState('');
     const [empName, setEmpName] = useState('');
@@ -22,7 +72,7 @@ const ManagerEmployees = () => {
     const handleAuthorizeManager = async (e) => {
         e.preventDefault();
         if (!isSuperAdmin) {
-            addToast('Only Super Admin can authorize managers', 'error');
+            addToast('Access Denied', 'error');
             return;
         }
         if (!authEmail) return;
@@ -33,14 +83,14 @@ const ManagerEmployees = () => {
             await setDoc(doc(db, 'authorized_managers', emailKey), {
                 email: emailKey,
                 authorizedBy: currentUser.email,
-                companyId: currentUser.companyId, // Include companyId for provisioning
+                companyId: currentUser.companyId,
                 createdAt: serverTimestamp()
             });
-            addToast(`Email ${emailKey} authorized as Manager for your enterprise`, 'success');
+            addToast(`${emailKey} is now invited`, 'success');
             setAuthEmail('');
         } catch (error) {
             console.error(error);
-            addToast('Error authorizing manager', 'error');
+            addToast('Request failed', 'error');
         } finally {
             setLoading(false);
         }
@@ -51,26 +101,21 @@ const ManagerEmployees = () => {
         if (!empName || !empEmail) return;
         setCreating(true);
 
-        if (!currentUser?.companyId) { // Added check for companyId
-            addToast("Manager's company information missing.", 'error');
+        if (!currentUser?.companyId) {
+            addToast("Company link missing", 'error');
             setCreating(false);
             return;
         }
 
-        // Auto-generate stable temporary password
         const tempPassword = `Griva@${Math.floor(1000 + Math.random() * 9000)}`;
-
-        // Use a temporary app to create the user without logging out the manager
         const tempAppName = `temp-app-${Date.now()}`;
         const tempApp = initializeApp(firebaseConfig, tempAppName);
         const tempAuth = getAuth(tempApp);
 
         try {
-            // 1. Create Auth Account
             const userCredential = await createUserWithEmailAndPassword(tempAuth, empEmail, tempPassword);
             const newUser = userCredential.user;
 
-            // 2. Create Firestore Profile
             await setDoc(doc(db, 'users', newUser.uid), {
                 uid: newUser.uid,
                 name: empName,
@@ -84,21 +129,13 @@ const ManagerEmployees = () => {
                 updatedAt: serverTimestamp()
             });
 
-            addToast(`Employee ${empName} created with password: ${tempPassword}`, 'success');
+            addToast(`Employee added with password: ${tempPassword}`, 'success');
             setEmpName('');
             setEmpEmail('');
         } catch (error) {
-            console.error("Employee Creation Error:", error);
-            let message = 'Error creating employee account';
-
-            if (error.code === 'auth/email-already-in-use') {
-                message = 'This email is already registered. Use a different email or manage the existing account below.';
-            } else if (error.code === 'auth/invalid-email') {
-                message = 'Please enter a valid email address.';
-            } else if (error.code === 'auth/weak-password') {
-                message = 'The generated password was too weak. Try again.';
-            }
-
+            console.error(error);
+            let message = 'Creation failed';
+            if (error.code === 'auth/email-already-in-use') message = 'Email already exists';
             addToast(message, 'error');
         } finally {
             await deleteApp(tempApp);
@@ -107,195 +144,155 @@ const ManagerEmployees = () => {
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
+        <div className="space-y-10 animate-in fade-in duration-700 pb-20 p-4 sm:p-0 font-['DM Sans']">
+            {/* Page Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-200">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800">User & Employee Management</h1>
-                    {isSuperAdmin && <p className="text-xs text-indigo-600 font-medium">Logged in as Super Admin</p>}
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-4">
+                        <div className="p-3 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-600/20">
+                            <Users className="text-white w-6 h-6" />
+                        </div>
+                        Team Members
+                    </h1>
+                    <p className="text-slate-500 mt-2 text-sm uppercase tracking-[3px] font-medium">Manage organization access & staff</p>
                 </div>
-                <div className="flex space-x-3">
-                    <button
-                        onClick={() => setShowInstructions(!showInstructions)}
-                        className="px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-medium rounded-lg transition-colors flex items-center space-x-2 border border-indigo-100"
-                    >
-                        <i className="w-5 h-5 flex items-center justify-center font-bold">?</i>
-                        <span>{showInstructions ? 'Hide Help' : 'Help'}</span>
-                    </button>
-                </div>
+                <button
+                    onClick={() => setShowInstructions(!showInstructions)}
+                    className="flex items-center gap-3 px-6 py-3 bg-white text-slate-500 hover:text-indigo-600 border border-slate-200 rounded-2xl transition-all shadow-sm active:scale-95 group"
+                >
+                    <HelpCircle size={18} className="group-hover:rotate-12 transition-transform" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">{showInstructions ? 'Close Guide' : 'Open Guide'}</span>
+                </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Manager Auth + Employee Create Column */}
-                <div className="lg:col-span-1 space-y-6">
-                    {/* Authorization Form - ONLY FOR SUPER ADMIN */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                {/* Control Column */}
+                <div className="lg:col-span-1 space-y-10">
+                    {/* Manager Invite - SUPER ADMIN ONLY */}
                     {isSuperAdmin && (
                         <div className="space-y-6">
-                            <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-6 rounded-xl shadow-lg border border-indigo-500">
-                                <h3 className="text-lg font-bold text-white mb-4 flex items-center">
-                                    <span className="w-8 h-8 rounded-lg bg-white/20 text-white flex items-center justify-center mr-2 text-sm border border-white/30">SA</span>
-                                    Authorize New Manager
+                            <div className="bg-white border border-slate-100 p-8 rounded-[40px] shadow-2xl shadow-slate-200/50 relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-full h-2 bg-indigo-600" />
+                                <h3 className="text-lg font-bold text-slate-900 mb-8 flex items-center gap-3 tracking-widest uppercase">
+                                    <ShieldAlert className="w-5 h-5 text-indigo-500" />
+                                    Invite Manager
                                 </h3>
-                                <form onSubmit={handleAuthorizeManager} className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-indigo-100 mb-1">Google Email</label>
-                                        <input
-                                            type="email"
-                                            value={authEmail}
-                                            onChange={(e) => setAuthEmail(e.target.value)}
-                                            placeholder="manager@gmail.com"
-                                            className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 focus:ring-2 focus:ring-white outline-none transition-all placeholder:text-white/40 text-white"
-                                            required
-                                        />
-                                        <p className="mt-2 text-xs text-indigo-100/70">Managers can create employees but not other managers.</p>
+                                <form onSubmit={handleAuthorizeManager} className="space-y-6">
+                                    <div className="group">
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-3 tracking-[1px] ml-1">Official Email</label>
+                                        <div className="relative">
+                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-indigo-500 transition-colors" />
+                                            <input
+                                                type="email"
+                                                value={authEmail}
+                                                onChange={(e) => setAuthEmail(e.target.value)}
+                                                placeholder="manager@company.com"
+                                                className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-bold rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
+                                                required
+                                            />
+                                        </div>
                                     </div>
                                     <button
                                         type="submit"
                                         disabled={loading}
-                                        className="w-full bg-white text-indigo-600 font-bold py-2 rounded-lg transition-all hover:bg-indigo-50 disabled:opacity-50"
+                                        className="w-full bg-indigo-600 text-white text-[10px] py-5 rounded-2xl transition-all hover:bg-indigo-700 active:scale-[0.98] uppercase tracking-[3px] font-bold shadow-xl shadow-indigo-600/20 border border-indigo-500"
                                     >
-                                        {loading ? 'Processing...' : 'Authorize Manager'}
+                                        {loading ? 'Processing...' : 'Send Access Invite'}
                                     </button>
                                 </form>
                             </div>
 
-                            {/* Authorized List Preview */}
                             <AuthorizedManagersList />
                         </div>
                     )}
 
-                    {/* Employee Form - FOR ALL MANAGERS */}
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                            <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center mr-2 text-sm">EM</span>
-                            Add New Employee
+                    {/* Employee Form */}
+                    <div className="bg-white border border-slate-100 p-8 rounded-[40px] shadow-2xl shadow-slate-200/50 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-2 bg-emerald-500" />
+                        <h3 className="text-lg font-bold text-slate-900 mb-8 flex items-center gap-3 tracking-widest uppercase">
+                            <UserPlus className="w-5 h-5 text-emerald-500" />
+                            Add Employee
                         </h3>
-                        <form onSubmit={handleCreateEmployee} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-                                <input
-                                    type="text"
-                                    value={empName}
-                                    onChange={(e) => setEmpName(e.target.value)}
-                                    placeholder="John Doe"
-                                    className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none transition-all placeholder:text-slate-300"
-                                    required
-                                />
+                        <form onSubmit={handleCreateEmployee} className="space-y-6">
+                            <div className="group">
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-3 tracking-[1px] ml-1">Legal Name</label>
+                                <div className="relative">
+                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors" />
+                                    <input
+                                        type="text"
+                                        value={empName}
+                                        onChange={(e) => setEmpName(e.target.value)}
+                                        placeholder="Full Name"
+                                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-bold rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-300"
+                                        required
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                                <input
-                                    type="email"
-                                    value={empEmail}
-                                    onChange={(e) => setEmpEmail(e.target.value)}
-                                    placeholder="emp@griva.com"
-                                    className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none transition-all placeholder:text-slate-300"
-                                    required
-                                />
+                            <div className="group">
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-3 tracking-[1px] ml-1">Work Email</label>
+                                <div className="relative">
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors" />
+                                    <input
+                                        type="email"
+                                        value={empEmail}
+                                        onChange={(e) => setEmpEmail(e.target.value)}
+                                        placeholder="email@company.com"
+                                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-bold rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-300"
+                                        required
+                                    />
+                                </div>
                             </div>
-                            <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-                                <p className="text-xs text-emerald-700 flex items-center leading-relaxed">
-                                    <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"></path></svg>
-                                    Employee will use "Employee Login" with a temporary password.
+                            <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 italic">
+                                <p className="text-[9px] text-emerald-600 font-bold tracking-widest flex items-center uppercase">
+                                    <ShieldCheck className="w-4 h-4 mr-3 shrink-0" />
+                                    Auto-generated temp password will be issued.
                                 </p>
                             </div>
                             <button
                                 type="submit"
                                 disabled={creating}
-                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg transition-all shadow-lg shadow-emerald-100 disabled:opacity-50"
+                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] py-5 rounded-2xl transition-all shadow-xl shadow-emerald-600/10 active:scale-[0.98] uppercase tracking-[3px] font-bold border border-emerald-500"
                             >
-                                {creating ? 'Creating Account...' : 'Create Employee Account'}
+                                {creating ? 'Processing...' : 'Register Employee'}
                             </button>
                         </form>
                     </div>
                 </div>
 
-                {/* Instructions */}
-                <div className={`${showInstructions ? 'block' : 'hidden'} lg:col-span-2 space-y-6`}>
-                    <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-200 animate-fade-in h-fit shadow-inner">
-                        <h3 className="text-lg font-bold text-indigo-900 mb-3 font-['Outfit']">Access Levels</h3>
-                        <div className="space-y-4">
-                            {isSuperAdmin && (
-                                <div className="bg-white/60 p-4 rounded-xl border border-indigo-200">
-                                    <p className="text-sm font-bold text-indigo-900 mb-1 flex items-center">
-                                        <span className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></span>
-                                        Super Admin Dashboard
-                                    </p>
-                                    <p className="text-xs text-indigo-800 opacity-80 leading-relaxed">
-                                        You are the only person who can authorize other Managers. Be careful with authorization as Managers have full access to policy data.
+                {/* Personnel Matrix */}
+                <div className="lg:col-span-2 space-y-10">
+                    {/* Help Section */}
+                    {showInstructions && (
+                        <div className="bg-indigo-600 p-10 rounded-[40px] text-white shadow-2xl shadow-indigo-600/20 animate-in slide-in-from-top-6 duration-700 relative overflow-hidden">
+                            <div className="absolute bottom-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mb-32 blur-3xl" />
+                            <h3 className="text-2xl font-bold mb-8 uppercase tracking-[4px]">Access Matrix</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                                <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/10">
+                                    <p className="text-[10px] text-indigo-200 mb-3 uppercase tracking-widest font-bold">Authority (Super Admin)</p>
+                                    <p className="text-xs font-bold leading-relaxed tracking-wider uppercase opacity-80">
+                                        Full node control. Ability to authorize managers & dissolve records.
                                     </p>
                                 </div>
-                            )}
-                            <div className="bg-white/60 p-4 rounded-xl border border-emerald-100">
-                                <p className="text-sm font-bold text-emerald-900 mb-1 flex items-center">
-                                    <span className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></span>
-                                    Manager Capabilities
-                                </p>
-                                <p className="text-xs text-emerald-800 opacity-80 leading-relaxed">
-                                    Managers can create employee accounts, view all policies, and manage banks. They cannot promote other users to Manager status.
-                                </p>
+                                <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/10">
+                                    <p className="text-[10px] text-indigo-200 mb-3 uppercase tracking-widest font-bold">Operational (Manager)</p>
+                                    <p className="text-xs font-bold leading-relaxed tracking-wider uppercase opacity-80">
+                                        Personnel management & data logging. Restricted from administrative nodes.
+                                    </p>
+                                </div>
                             </div>
-                            <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 text-xs text-amber-800 leading-relaxed">
-                                <p className="font-bold flex items-center mb-1">
-                                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path></svg>
-                                    Password Reset Protocol
-                                </p>
-                                When an employee resets their password, their **"tempPassword"** remains listed for your records until you refresh.
-                            </div>
+                        </div>
+                    )}
+
+                    <div className="bg-white border border-slate-100 rounded-[40px] shadow-2xl shadow-slate-200/50 overflow-hidden">
+                        <div className="p-10 border-b border-slate-50 bg-slate-50/30">
+                            <h3 className="text-2xl font-bold text-slate-900 tracking-tight uppercase">Operational Personnel</h3>
+                            <p className="text-[10px] text-slate-400 uppercase tracking-[4px] mt-2 font-bold">Live Organization Matrix</p>
+                        </div>
+                        <div className="p-2">
+                            <EmployeeList />
                         </div>
                     </div>
                 </div>
-            </div>
-
-
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <EmployeeList />
-            </div>
-        </div>
-    );
-};
-
-const AuthorizedManagersList = () => {
-    const [list, setList] = React.useState([]);
-    const { currentUser } = useAuth();
-    const { addToast } = useToast();
-
-    React.useEffect(() => {
-        if (!currentUser?.companyId) return;
-        const q = query(collection(db, 'authorized_managers'), where('companyId', '==', currentUser.companyId));
-        return onSnapshot(q, (snap) => {
-            setList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
-    }, [currentUser]);
-
-    const removeAuth = async (email) => {
-        try {
-            await deleteDoc(doc(db, 'authorized_managers', email));
-            addToast(`Authorization removed for ${email}`, 'info');
-        } catch (e) {
-            addToast('Error removing authorization', 'error');
-        }
-    };
-
-    if (list.length === 0) return null;
-
-    return (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Pending Authorizations</h4>
-            <div className="space-y-3">
-                {list.map(item => (
-                    <div key={item.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                        <div className="min-w-0">
-                            <p className="text-sm font-bold text-slate-700 truncate">{item.email}</p>
-                            <p className="text-[10px] text-slate-400">Authorized {new Date(item.createdAt?.seconds * 1000).toLocaleDateString()}</p>
-                        </div>
-                        <button
-                            onClick={() => removeAuth(item.id)}
-                            className="p-1 px-2 text-[10px] font-bold text-rose-500 hover:bg-rose-50 rounded transition-colors"
-                        >
-                            REVOKE
-                        </button>
-                    </div>
-                ))}
             </div>
         </div>
     );

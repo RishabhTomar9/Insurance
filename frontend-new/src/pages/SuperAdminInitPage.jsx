@@ -77,7 +77,7 @@ const SuperAdminInitPage = () => {
                     <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-500/10 rounded-2xl mb-4 border border-blue-500/20">
                         <ShieldCheck className="w-8 h-8 text-blue-500" />
                     </div>
-                    <h1 className="text-3xl font-extrabold font-['Rajdhani'] text-white tracking-wider uppercase">Initialize Super Admin</h1>
+                    <h1 className="text-3xl font-extrabold font-bold text-white tracking-wider uppercase">Initialize Super Admin</h1>
                     <p className="text-[#6b7db3] text-sm uppercase tracking-widest">Phase 1 · Global Control Setup</p>
                 </div>
 

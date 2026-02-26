@@ -115,7 +115,7 @@ const LoginPage = () => {
                         <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-600/20">
                             <ShieldCheck className="w-10 h-10 text-white" />
                         </div>
-                        <h1 className="text-4xl font-extrabold text-white font-['Rajdhani'] tracking-[4px]">SHRIVA-INS</h1>
+                        <h1 className="text-4xl font-extrabold text-white font-bold tracking-[4px]">SHRIVA-INS</h1>
                     </div>
 
                     <div className="space-y-4">
@@ -136,7 +136,7 @@ const LoginPage = () => {
             <div className="flex-1 flex flex-col justify-center items-center p-8 bg-[#0b0e1a]">
                 <div className="w-full max-w-md space-y-8">
                     <div className="text-center space-y-2">
-                        <h2 className="text-3xl font-bold text-white font-['Rajdhani'] tracking-widest uppercase">PORTAL LOGIN</h2>
+                        <h2 className="text-3xl font-bold text-white font-bold tracking-widest uppercase">PORTAL LOGIN</h2>
                         <p className="text-[#6b7db3] text-sm uppercase tracking-[2px]">Select your access method</p>
                     </div>
 
